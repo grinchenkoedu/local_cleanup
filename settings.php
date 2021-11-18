@@ -31,7 +31,7 @@ if ($hassiteconfig) {
     );
 
     $settings = new admin_settingpage(
-        'local_cleanup',
+        'local_cleanup_admin',
         get_string('settingspage', 'local_cleanup')
     );
     $ADMIN->add('localplugins', $settings);
@@ -51,6 +51,16 @@ if ($hassiteconfig) {
             'cleanup_backup_timeout',
             get_string('backuplifetime', 'local_cleanup'),
             get_string('backuplifetimedesc', 'local_cleanup'),
+            local_cleanup\task\cleanup::SECONDS_MONTH,
+            PARAM_INT
+        )
+    );
+
+    $settings->add(
+        new admin_setting_configtext(
+            'cleanup_draft_timeout',
+            get_string('draftlifetime', 'local_cleanup'),
+            get_string('draftlifetimedesc', 'local_cleanup'),
             local_cleanup\task\cleanup::SECONDS_MONTH,
             PARAM_INT
         )

@@ -59,7 +59,7 @@ class scan extends scheduled_task
                 continue;
             }
 
-            $record = $this->db->get_record('files', ['contenthash' => $item]);
+            $record = $this->db->get_record('files', ['contenthash' => $item], '*', IGNORE_MULTIPLE);
 
             if (empty($record)) {
                 $size = filesize($itemPath);
@@ -74,8 +74,6 @@ class scan extends scheduled_task
                         $itemPath
                     )
                 );
-
-                continue;
             }
         }
 

@@ -17,7 +17,7 @@ $PAGE->set_context(context_system::instance());
 $PAGE->set_url('/local/cleanup/files.php');
 $PAGE->set_title('Users files');
 $PAGE->set_heading('Users files');
-$PAGE->set_pagelayout('default');
+$PAGE->set_pagelayout('admin');
 
 require_login();
 
@@ -27,6 +27,7 @@ $limit = $CFG->cleanup_items_per_page ?? finder::LIMIT_DEFAULT;
 $filter = [
     'name_like' => optional_param('name_like', '', PARAM_TEXT),
     'user_like' => optional_param('user_like', '', PARAM_TEXT),
+    'component' => optional_param('component', '', PARAM_TEXT),
 ];
 
 $filter_form = new filter_form(null, $filter);
@@ -40,6 +41,8 @@ $redirect_url = new moodle_url($PAGE->url, array_merge($filter, ['page' => $page
 
 $finder = new finder($DB, $USER->id, $is_admin);
 $items = $finder->find($limit, $page * $limit, $filter);
+$totalItems = $finder->count($filter);
+$maxItems = pow(10, 3) * ($page + 1);
 
 $table = new html_table();
 $table->head = [
@@ -91,7 +94,7 @@ while ($items->valid()) {
         sprintf('%s, %s', $item->component, $item->filearea),
         sprintf(
             '%.1f %s',
-            $item->filesize / 1024 / 1024,
+            $item->filesize / pow(1024, 2),
             get_string('sizemb')
         ),
         html_writer::link(
@@ -108,7 +111,12 @@ while ($items->valid()) {
     $items->next();
 }
 
-$pagination = $OUTPUT->paging_bar($finder->count($filter), $page, $limit, new moodle_url($PAGE->url, $filter));
+$pagination = $OUTPUT->paging_bar(
+    $totalItems > $maxItems ? $maxItems : $totalItems,
+    $page,
+    $limit,
+    new moodle_url($PAGE->url, $filter)
+);
 
 echo $OUTPUT->header();
 

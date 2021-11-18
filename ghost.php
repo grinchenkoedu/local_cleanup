@@ -16,7 +16,7 @@ $PAGE->set_context(context_system::instance());
 $PAGE->set_url('/local/cleanup/ghost.php');
 $PAGE->set_title('Ghost files');
 $PAGE->set_heading('Ghost files');
-$PAGE->set_pagelayout('default');
+$PAGE->set_pagelayout('admin');
 
 require_login();
 

@@ -36,6 +36,11 @@ class cleanup extends scheduled_task
      */
     private $backupTimeout;
 
+    /**
+     * @var int
+     */
+    private $draftTimeout;
+
     public function __construct()
     {
         global $DB, $CFG;
@@ -43,6 +48,7 @@ class cleanup extends scheduled_task
         $this->db = $DB;
         $this->dataRoot = $CFG->dataroot;
         $this->backupTimeout = $CFG->cleanup_backup_timeout ?? self::SECONDS_MONTH;
+        $this->draftTimeout = $CFG->cleanup_draft_timeout ?? self::SECONDS_MONTH;
         $this->isAutoRemoveEnabled = (bool)$CFG->cleanup_run_autoremove ?? true;
         $this->fs = get_file_storage();
     }
@@ -54,10 +60,45 @@ class cleanup extends scheduled_task
 
     public function execute()
     {
-        $this->checkoutFiles();
-
         if ($this->isAutoRemoveEnabled) {
+            $this->clearDirectory('trashdir');
+            $this->clearDirectory('temp');
+            $this->clearDirectory('cache');
+
             $this->autoRemove();
+        }
+
+        $this->checkoutFiles();
+    }
+
+    private function clearDirectory($name, $printTrace = true)
+    {
+        $directory = $this->dataRoot . DIRECTORY_SEPARATOR . $name;
+
+        if ($printTrace) {
+            mtrace(sprintf('Clearing %s...', $directory), null);
+        }
+
+        $files = scandir($directory);
+
+        foreach ($files as $file) {
+            if (in_array($file, ['..', '.'], true)) {
+                continue;
+            }
+
+            $path = $directory . DIRECTORY_SEPARATOR . $file;
+
+            if (is_dir($path)) {
+                $this->clearDirectory($name . DIRECTORY_SEPARATOR . $file, false);
+
+                continue;
+            }
+
+            unlink($path);
+        }
+
+        if ($printTrace) {
+            mtrace('Done!');
         }
     }
 
@@ -133,6 +174,17 @@ class cleanup extends scheduled_task
             && $file->get_timecreated() <= time() - $this->backupTimeout
         ) {
             mtrace(sprintf('Backup "%s" is outdated... ', $file->get_filename()), null);
+
+            unlink($uri);
+
+            return false;
+        }
+
+        if (
+            $file->get_filearea() === 'draft'
+            && $file->get_timecreated() <= time() - $this->draftTimeout
+        ) {
+            mtrace(sprintf('Outdated draft "%s"... ', $file->get_filename()), null);
 
             unlink($uri);
 

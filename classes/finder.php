@@ -8,7 +8,9 @@ use dml_exception;
 
 class finder
 {
+    const TABLE_FILES = 'files';
     const LIMIT_DEFAULT = 50;
+    const SELECT_ALL = '';
 
     /**
      * @var moodle_database
@@ -86,6 +88,10 @@ class finder
             $values['user_like'] = '%' . $filter['user_like'] . '%';
         }
 
+        if (!empty($filter['component'])) {
+            $values['component'] = $filter['component'];
+        }
+
         return $values;
     }
 
@@ -104,6 +110,10 @@ class finder
         $where = [
             'f.filesize != 0'
         ];
+
+        if (!empty($filter['component'])) {
+            $where[] = 'f.component LIKE :component';
+        }
 
         if (!empty($filter['name_like'])) {
             $where[] = 'f.filename LIKE :name_like';
@@ -131,7 +141,7 @@ class finder
 
         return sprintf(
             'SELECT %s FROM {files} f LEFT JOIN {user} u ON f.userid = u.id WHERE %s ORDER BY %s %s',
-            'f.*, u.firstname, u.lastname',
+            'f.*,' . get_all_user_name_fields(true, 'u'),
             implode(' AND ', $where),
             'f.filesize DESC',
             $offset > 0 ? sprintf('LIMIT %d, %d', $offset, $limit) : sprintf('LIMIT %d', $limit)
