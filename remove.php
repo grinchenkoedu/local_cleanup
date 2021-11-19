@@ -60,14 +60,14 @@ if ($form->is_confirmed()) {
     $message_type = notification::SUCCESS;
 
     if ($resource === false) {
-        // looks like the file is missing, so we just removing the record.
-        $DB->delete_records('files', ['id' => $id]);
+        // looks like the file is missing, so just removing the record.
+        $DB->delete_records('files', ['contenthash' => $file->get_contenthash()]);
     } else {
         $uri = stream_get_meta_data($resource)['uri'];
         fclose($resource);
 
         if (unlink($uri)) {
-            $DB->delete_records('files', ['id' => $id]);
+            $DB->delete_records('files', ['contenthash' => $file->get_contenthash()]);
         } else {
             $message = get_string(
                 'failtoremove',

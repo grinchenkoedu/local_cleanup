@@ -61,10 +61,6 @@ class cleanup extends scheduled_task
     public function execute()
     {
         if ($this->isAutoRemoveEnabled) {
-            $this->clearDirectory('trashdir');
-            $this->clearDirectory('temp');
-            $this->clearDirectory('cache');
-
             $this->autoRemove();
         }
 
@@ -76,7 +72,7 @@ class cleanup extends scheduled_task
         $directory = $this->dataRoot . DIRECTORY_SEPARATOR . $name;
 
         if ($printTrace) {
-            mtrace(sprintf('Clearing %s...', $directory), null);
+            mtrace(sprintf('Clearing %s... ', $directory), null);
         }
 
         $files = scandir($directory);
@@ -107,25 +103,35 @@ class cleanup extends scheduled_task
         mtrace('Fetching records... ', null);
 
         $ids = $this->db->get_fieldset_select('files', 'id', self::SELECT_ALL);
+        $count = count($ids);
+        $progress = 0;
 
         mtrace(sprintf('%d records found.', count($ids)));
+        mtrace('Processing... ', null);
 
-        foreach ($ids as $id) {
+        foreach ($ids as $index => $id) {
+            $done = ceil(($index * 100) / $count);
+
+            if ($done > $progress) {
+                mtrace(sprintf('%d%%... ', $done), null);
+                $progress = $done;
+            }
+
             if ($this->checkout($id)) {
-                mtrace('Continue...');
-
                 continue;
             }
 
             $this->db->delete_records('files', ['id' => $id]);
-
-            mtrace('Removed!');
         }
     }
 
     private function autoRemove()
     {
-        mtrace('Cleaning ghost files...', null);
+        $this->clearDirectory('trashdir');
+        $this->clearDirectory('temp');
+        $this->clearDirectory('cache');
+
+        mtrace('Clearing ghost files... ', null);
 
         $ghost_files = $this->db->get_recordset('cleanup', [], '', 'id, path');
 
@@ -161,7 +167,7 @@ class cleanup extends scheduled_task
         $resource = $this->fs->get_file_system()->get_content_file_handle($file);
 
         if ($resource === false) {
-            mtrace(sprintf('File "%s" is not found or not readable... ', $id), null);
+            mtrace(sprintf('File "%s" is not found or not readable. Removed.', $id));
 
             return false;
         }
@@ -173,9 +179,12 @@ class cleanup extends scheduled_task
             preg_match('/\.mbz$/', $file->get_filename())
             && $file->get_timecreated() <= time() - $this->backupTimeout
         ) {
-            mtrace(sprintf('Backup "%s" is outdated... ', $file->get_filename()), null);
-
             unlink($uri);
+            mtrace(sprintf(
+                'Backup "%s" (%s) is outdated. Removed.',
+                $file->get_filename(),
+                $file->get_contenthash()
+            ));
 
             return false;
         }
@@ -184,14 +193,15 @@ class cleanup extends scheduled_task
             $file->get_filearea() === 'draft'
             && $file->get_timecreated() <= time() - $this->draftTimeout
         ) {
-            mtrace(sprintf('Outdated draft "%s"... ', $file->get_filename()), null);
-
             unlink($uri);
+            mtrace(
+                sprintf('Outdated draft "%s" (%s). Removed.',
+                    $file->get_filename(),
+                    $file->get_contenthash()
+                ));
 
             return false;
         }
-
-        mtrace(sprintf('File "%s" (id "%d") checked out! ', $uri, $id), null);
 
         return true;
     }

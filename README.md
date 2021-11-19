@@ -4,8 +4,11 @@ Main features:
 * helps to find big files to clean-up disk and database;
 * auto-remove garbage files from the moodle files directory (configurable);
 * auto-remove courses backups (configurable).
+* auto-remove draft files (configurable).
+* clean-up cache and temporary files.
 
-The plugin tested on a real production Moodle system with lots of files and huge database.
+The plugin tested on the real production Moodle system with lots of files (~2Tb) and huge database (>5000k records).
+It's recommended to add additional indexes manually fot better performance.
 
 ## Requirements
 * PHP => 7.0
@@ -26,5 +29,5 @@ Auto clean-up can be disabled in the plugin settings.
 
 ## Q&A
 
-**Q**: I don't want to remove backup files automatically, can I disable this feature?
+**Q**: I don't want to remove backup or draft files automatically, can I disable this feature?
 **A**: Yes and no. You can set the lifetime setting to something like 10 years.

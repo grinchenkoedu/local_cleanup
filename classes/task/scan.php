@@ -6,8 +6,6 @@ use core\task\scheduled_task;
 
 class scan extends scheduled_task
 {
-    const FILE_DIR = 'filedir';
-
     /**
      * @var \moodle_database
      */
@@ -33,18 +31,18 @@ class scan extends scheduled_task
 
     public function execute()
     {
-        $sizeTotal = $this->scanRecursive(self::FILE_DIR);
+        $sizeTotal = $this->scanRecursive('filedir');
 
         mtrace(sprintf('Total found: %.3f GB', $sizeTotal / 1024 / 1024 / 1024));
     }
 
-    private function scanRecursive(string $path): int
+    private function scanRecursive(string $path, bool $printProgress = true): int
     {
         $size_total = 0;
         $absolute = $this->data_root . DIRECTORY_SEPARATOR . $path;
         $list = scandir($absolute);
 
-        foreach ($list as $item) {
+        foreach ($list as $index => $item) {
             if (preg_match('@^\.@', $item)) {
                 continue;
             }
@@ -52,14 +50,20 @@ class scan extends scheduled_task
             $itemPath = $absolute . DIRECTORY_SEPARATOR . $item;
 
             if (is_dir($itemPath)) {
-                mtrace(sprintf('Searching in "%s" ...', $itemPath));
+                if ($printProgress) {
+                    mtrace(sprintf(
+                        'Searching in "%s" (%d%%)...',
+                        $itemPath,
+                        ($index * 100) / count($list)
+                    ));
+                }
 
-                $size_total += $this->scanRecursive($path . DIRECTORY_SEPARATOR . $item);
+                $size_total += $this->scanRecursive($path . DIRECTORY_SEPARATOR . $item, false);
 
                 continue;
             }
 
-            $record = $this->db->get_record('files', ['contenthash' => $item], '*', IGNORE_MULTIPLE);
+            $record = $this->db->get_record('files', ['contenthash' => $item], 'id', IGNORE_MULTIPLE);
 
             if (empty($record)) {
                 $size = filesize($itemPath);
