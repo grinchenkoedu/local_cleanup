@@ -157,6 +157,8 @@ class cleanup extends scheduled_task
      */
     private function checkout($id)
     {
+        global $DB;
+
         $file = $this->fs->get_file_by_id($id);
 
         if ($file === false) {
@@ -192,6 +194,7 @@ class cleanup extends scheduled_task
         if (
             $file->get_filearea() === 'draft'
             && $file->get_timecreated() <= time() - $this->draftTimeout
+            && 1 === $DB->count_records('files', ['contenthash' => $file->get_contenthash()])
         ) {
             unlink($uri);
             mtrace(

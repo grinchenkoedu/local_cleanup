@@ -19,3 +19,4 @@ $string['draftlifetime'] = 'Backup files lifetime';
 $string['draftlifetimedesc'] = 'Time in seconds';
 $string['autoremove'] = 'Auto remove outdated files';
 $string['autoremovedesc'] = 'Remove outdated files found on the filesystem on next clean-up';
+$string['alsowillberemoved'] = 'Also will be removed ({$a->contenthash}) : ';

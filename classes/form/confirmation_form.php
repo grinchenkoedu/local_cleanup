@@ -28,6 +28,10 @@ class confirmation_form extends moodleform
 
         $this->_form->addElement('html', html_writer::tag('div', $this->_customdata['message']));
 
+        if (!empty($this->_customdata['html'])) {
+            $this->_form->addElement('html', html_writer::tag('div', $this->_customdata['html']));
+        }
+
         $this->_form->addGroup($this->getButtons(), 'buttonarr', '', [' '], false);
     }
 

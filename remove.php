@@ -24,14 +24,51 @@ require_login();
 $id = optional_param('id', 0, PARAM_INT);
 $file = $DB->get_record('files', ['id' => $id], '*', MUST_EXIST);
 
-if ($file->userid !== $USER->id && !is_siteadmin()) {
+if (!is_siteadmin()) {
     header('HTTP/1.1 403 Forbidden');
     exit('Forbidden!');
 }
 
-$redirect_url = new moodle_url(optional_param('redirect', '', PARAM_TEXT));
+$redirect_url = new moodle_url(optional_param('redirect', '/local/cleanup/files.php', PARAM_TEXT));
+$similar = $DB->get_records('files', ['contenthash' => $file->contenthash]);
+$similar = array_filter(
+    $DB->get_records('files', ['contenthash' => $file->contenthash]),
+    function ($item) use ($file) {
+        return $item->id !== $file->id;
+    }
+);
 
-$form = new confirmation_form(null, [
+$table = new html_table();
+$table->head = [
+    get_string('filename', 'backup'),
+    get_string('component', 'cache'),
+    get_string('user', 'admin'),
+    get_string('date'),
+    ''
+];
+$table->size = ['35%', '15%', '25%', '14%', '1%'];
+
+foreach ($similar as $item) {
+    if (empty($owner) || $owner->id !== $item->userid) {
+        $owner = $DB->get_record('user', ['id' => $item->userid]);
+    }
+
+    $table->data[] = [
+        $item->filename,
+        sprintf('%s, %s', $item->component, $item->filearea),
+        fullname($owner),
+        date('Y-m-d H:i', $item->timecreated),
+        html_writer::link(
+            new moodle_url('/local/cleanup/open.php', ['id' => $item->id]),
+            $OUTPUT->pix_icon('i/preview', get_string('view')),
+            [
+                'target' => '_blank'
+            ]
+        ),
+    ];
+}
+
+$form_parameters = [
     'id' => $id,
     'message' => get_string(
         'removeconfirm',
@@ -41,8 +78,27 @@ $form = new confirmation_form(null, [
             'id' => $id,
         ]
     ),
-    'redirect' => (string)$redirect_url
-]);
+    'redirect' => (string)$redirect_url,
+];
+
+if (count($table->data) > 0) {
+    $form_parameters['html'] =
+        html_writer::tag(
+            'div',
+            get_string('alsowillberemoved','local_cleanup', $file),
+            [
+                'style' => 'color:red; padding-top: 10px'
+            ]
+        ) .
+        html_writer::table($table)
+    ;
+}
+
+$form = new confirmation_form(null, $form_parameters);
+
+if ($form->is_cancelled()) {
+    redirect($redirect_url);
+}
 
 if ($form->is_confirmed()) {
     $fs = get_file_storage();
