@@ -129,7 +129,6 @@ class cleanup extends scheduled_task
     {
         $this->clearDirectory('trashdir');
         $this->clearDirectory('temp');
-        $this->clearDirectory('cache');
 
         mtrace('Clearing ghost files... ', null);
 
