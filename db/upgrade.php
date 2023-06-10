@@ -38,5 +38,21 @@ function xmldb_local_cleanup_upgrade($oldversion = 0)
         $manager->create_table($cleanup_table);
     }
 
+    if ($oldversion < 2023061000) {
+        $table = new xmldb_table('files');
+        $manager->add_index(
+            $table,
+            new xmldb_index('component', XMLDB_INDEX_NOTUNIQUE, ['component'])
+        );
+        $manager->add_index(
+            $table,
+            new xmldb_index('component_filesize', XMLDB_INDEX_NOTUNIQUE, ['component', 'filesize'])
+        );
+        $manager->add_index(
+            $table,
+            new xmldb_index('component_timecreated', XMLDB_INDEX_NOTUNIQUE, ['component', 'timecreated'])
+        );
+    }
+
     return true;
 }

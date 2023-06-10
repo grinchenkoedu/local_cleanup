@@ -35,6 +35,7 @@ class filter_form extends moodleform
         $form->addElement('select', 'component', get_string('module', 'backup'), [
             null => '-',
             'tool_recyclebin' => get_string('pluginname', 'tool_recyclebin'),
+            'backup' => get_string('backup'),
             'user' => get_string('user', 'admin'),
         ]);
         $form->setDefault('component', $component);

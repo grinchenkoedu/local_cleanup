@@ -80,8 +80,8 @@ class finder
     {
         $sql = '
             SELECT 
-                COUNT(id) as `count`,
-                SUM(filesize) as `size`
+                COUNT(f.id) as `count`,
+                SUM(f.filesize) as `size`
             FROM {files} f
             WHERE f.component = ?
         ';
@@ -134,7 +134,7 @@ class finder
         ];
 
         if (!empty($filter['component'])) {
-            $where[] = 'f.component LIKE :component';
+            $where[] = 'f.component = :component';
         }
 
         if (!empty($filter['name_like'])) {
