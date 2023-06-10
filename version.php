@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * @copyright  Yevhen Matasar <matasar.ei@gmail.com>
+ * @author Yevhen Matasar <matasar.ei@gmail.com>
  *
  * @var $plugin stdClass
  */
@@ -23,7 +23,7 @@
 defined('MOODLE_INTERNAL') || die('Direct access to this script is forbidden.'); 
 
 $plugin->component = 'local_cleanup';
-$plugin->version =  2021111800;
+$plugin->version =  2023060700;
 $plugin->maturity = MATURITY_STABLE;
-$plugin->release = '1.1';
-$plugin->requires = 2017111300; // >= Moodle 3.0, PHP >= 7.0
+$plugin->release = '1.2';
+$plugin->requires = 2017111300; // >= Moodle 3.4, PHP >= 7.0

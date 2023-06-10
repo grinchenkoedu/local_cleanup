@@ -11,12 +11,11 @@ require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir . '/formslib.php');
 
 use core\notification;
-use local_cleanup\form\confirmation_form;
 
 $PAGE->set_context(context_system::instance());
 $PAGE->set_url('/local/cleanup/remove.php');
-$PAGE->set_title('Remove file');
-$PAGE->set_heading('Remove file');
+$PAGE->set_title(get_string('remove'));
+$PAGE->set_heading(get_string('remove'));
 $PAGE->set_pagelayout('default');
 
 require_login();
@@ -30,77 +29,8 @@ if (!is_siteadmin()) {
 }
 
 $redirect_url = new moodle_url(optional_param('redirect', '/local/cleanup/files.php', PARAM_TEXT));
-$similar = $DB->get_records('files', ['contenthash' => $file->contenthash]);
-$similar = array_filter(
-    $DB->get_records('files', ['contenthash' => $file->contenthash]),
-    function ($item) use ($file) {
-        return $item->id !== $file->id;
-    }
-);
 
-$table = new html_table();
-$table->head = [
-    get_string('filename', 'backup'),
-    get_string('component', 'cache'),
-    get_string('user', 'admin'),
-    get_string('date'),
-    ''
-];
-$table->size = ['35%', '15%', '25%', '14%', '1%'];
-
-foreach ($similar as $item) {
-    if (empty($owner) || $owner->id !== $item->userid) {
-        $owner = $DB->get_record('user', ['id' => $item->userid]);
-    }
-
-    $table->data[] = [
-        $item->filename,
-        sprintf('%s, %s', $item->component, $item->filearea),
-        fullname($owner),
-        date('Y-m-d H:i', $item->timecreated),
-        html_writer::link(
-            new moodle_url('/local/cleanup/open.php', ['id' => $item->id]),
-            $OUTPUT->pix_icon('i/preview', get_string('view')),
-            [
-                'target' => '_blank'
-            ]
-        ),
-    ];
-}
-
-$form_parameters = [
-    'id' => $id,
-    'message' => get_string(
-        'removeconfirm',
-        'local_cleanup',
-        [
-            'name' => $file->filepath . $file->filename,
-            'id' => $id,
-        ]
-    ),
-    'redirect' => (string)$redirect_url,
-];
-
-if (count($table->data) > 0) {
-    $form_parameters['html'] =
-        html_writer::tag(
-            'div',
-            get_string('alsowillberemoved','local_cleanup', $file),
-            [
-                'style' => 'color:red; padding-top: 10px'
-            ]
-        ) .
-        html_writer::table($table)
-    ;
-}
-
-$form = new confirmation_form(null, $form_parameters);
-
-if ($form->is_cancelled()) {
-    redirect($redirect_url);
-}
-
-if ($form->is_confirmed()) {
+if (optional_param('confirm', false, PARAM_BOOL)) {
     $fs = get_file_storage();
     $file = $fs->get_file_instance($file);
 
@@ -115,7 +45,7 @@ if ($form->is_confirmed()) {
     );
     $message_type = notification::SUCCESS;
 
-    if ($resource === false) {
+    if (!$resource) {
         // looks like the file is missing, so just removing the record.
         $DB->delete_records('files', ['contenthash' => $file->get_contenthash()]);
     } else {
@@ -141,6 +71,20 @@ if ($form->is_confirmed()) {
 
 echo $OUTPUT->header();
 
-$form->display();
+echo $OUTPUT->confirm(
+    sprintf(
+        '%s %s <b>%s</b>, %s %s?',
+        get_string('remove'),
+        mb_strtolower(get_string('file')),
+        $file->filename,
+        round($file->filesize / 1024 / 1024, 2),
+        get_string('sizemb')
+    ),
+    new moodle_url($PAGE->url, [
+        'id' => $id,
+        'confirm' => 1,
+    ]),
+    $redirect_url
+);
 
 echo $OUTPUT->footer();

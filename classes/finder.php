@@ -2,15 +2,13 @@
 
 namespace local_cleanup;
 
+use dml_exception;
 use moodle_database;
 use moodle_recordset;
-use dml_exception;
 
 class finder
 {
-    const TABLE_FILES = 'files';
     const LIMIT_DEFAULT = 50;
-    const SELECT_ALL = '';
 
     /**
      * @var moodle_database
@@ -72,6 +70,30 @@ class finder
     }
 
     /**
+     * @param string $component
+     *
+     * @return object {count: int, size: int (bytes)}
+     *
+     * @throws dml_exception
+     */
+    public function stats(string $component, string $until = null)
+    {
+        $sql = '
+            SELECT 
+                COUNT(id) as `count`,
+                SUM(filesize) as `size`
+            FROM {files} f
+            WHERE f.component = ?
+        ';
+
+        if ($until !== null) {
+            $sql .= ' AND f.timecreated < ' . strtotime($until);
+        }
+
+        return $this->db->get_record_sql($sql, [$component]);
+    }
+
+    /**
      * @param array $filter
      *
      * @return array
@@ -108,7 +130,7 @@ class finder
     private function get_search_sql(array $filter, $count = false, $limit = self::LIMIT_DEFAULT, $offset = 0)
     {
         $where = [
-            'f.filesize != 0'
+            sprintf('f.filesize > %d', ($filter['filesize'] ?? 0) * 1024 * 1024)
         ];
 
         if (!empty($filter['component'])) {
@@ -121,7 +143,12 @@ class finder
 
         if (!empty($filter['user_like'])) {
             $where[] = "(CONCAT(u.firstname, ' ', u.lastname) LIKE :user_like 
-                      OR CONCAT(u.lastname, ' ', u.firstname) LIKE :user_like)";
+                      OR CONCAT(u.lastname, ' ', u.firstname) LIKE :user_like
+                      OR f.author LIKE :user_like)";
+        }
+
+        if (!empty($filter['user_deleted'])) {
+            $where[] = 'u.deleted = 1';
         }
 
         if (!$this->admin_mode) {
@@ -134,16 +161,15 @@ class finder
 
         if ($count) {
             return sprintf(
-                'SELECT COUNT(f.id) FROM {files} f WHERE %s',
+                'SELECT COUNT(f.id) FROM {files} f LEFT JOIN {user} u ON f.userid = u.id WHERE %s',
                 implode(' AND ', $where)
             );
         }
 
         return sprintf(
-            'SELECT %s FROM {files} f LEFT JOIN {user} u ON f.userid = u.id WHERE %s ORDER BY %s %s',
-            'f.*,' . get_all_user_name_fields(true, 'u'),
+            'SELECT %s FROM {files} f LEFT JOIN {user} u ON f.userid = u.id WHERE %s GROUP BY f.contenthash %s',
+            'f.*, u.deleted as user_deleted, ' . get_all_user_name_fields(true, 'u'),
             implode(' AND ', $where),
-            'f.filesize DESC',
             $offset > 0 ? sprintf('LIMIT %d, %d', $offset, $limit) : sprintf('LIMIT %d', $limit)
         );
     }

@@ -14,8 +14,8 @@ use local_cleanup\task\cleanup;
 
 $PAGE->set_context(context_system::instance());
 $PAGE->set_url('/local/cleanup/ghost.php');
-$PAGE->set_title('Ghost files');
-$PAGE->set_heading('Ghost files');
+$PAGE->set_title(get_string('ghostfiles', 'local_cleanup'));
+$PAGE->set_heading(get_string('ghostfiles', 'local_cleanup'));
 $PAGE->set_pagelayout('admin');
 
 require_login();
@@ -57,7 +57,7 @@ while ($items->valid()) {
         $item->mime,
         sprintf(
             '%.1f %s',
-            $item->size / 1024 / 1024,
+            $item->size / pow(1024, 2),
             get_string('sizemb')
         ),
         implode(' ', $actions)
@@ -78,7 +78,7 @@ echo $OUTPUT->box(
                 'local_cleanup',
                 [
                     'files' => $total_items,
-                    'size' => sprintf('%.3f', $total_size / 1024 / 1024 / 1024),
+                    'size' => sprintf('%.3f', $total_size / pow(1024, 3)),
                     'cleanup_date' => date(DATE_ISO8601, $task->get_next_run_time()),
                 ]
             )

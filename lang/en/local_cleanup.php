@@ -1,6 +1,6 @@
 <?php
 
-$string['pluginname'] = 'Moodle clean-up';
+$string['pluginname'] = 'Clean-up';
 $string['title'] = 'Clean-up';
 $string['userfiles'] = 'Users files';
 $string['ghostfiles'] = 'Ghost files';
@@ -19,4 +19,7 @@ $string['draftlifetime'] = 'Backup files lifetime';
 $string['draftlifetimedesc'] = 'Time in seconds';
 $string['autoremove'] = 'Auto remove outdated files';
 $string['autoremovedesc'] = 'Remove outdated files found on the filesystem on next clean-up';
-$string['alsowillberemoved'] = 'Also will be removed ({$a->contenthash}) : ';
+$string['files_total'] = 'Files total';
+$string['assignsubmission_file'] = 'Uploaded students\' submissions';
+$string['backup'] = 'Backup copies';
+$string['batchremovaldone'] = 'Batch removal completed';

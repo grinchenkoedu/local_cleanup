@@ -15,8 +15,8 @@ use local_cleanup\form\filter_form;
 
 $PAGE->set_context(context_system::instance());
 $PAGE->set_url('/local/cleanup/files.php');
-$PAGE->set_title('Users files');
-$PAGE->set_heading('Users files');
+$PAGE->set_title(get_string('files'));
+$PAGE->set_heading(get_string('files'));
 $PAGE->set_pagelayout('admin');
 
 require_login();
@@ -25,9 +25,11 @@ $page = optional_param('page', 0, PARAM_INT);
 $limit = $CFG->cleanup_items_per_page ?? finder::LIMIT_DEFAULT;
 
 $filter = [
+    'filesize' => optional_param('filesize', 50, PARAM_INT),
     'name_like' => optional_param('name_like', '', PARAM_TEXT),
     'user_like' => optional_param('user_like', '', PARAM_TEXT),
     'component' => optional_param('component', '', PARAM_TEXT),
+    'user_deleted' => optional_param('user_deleted', '', PARAM_TEXT),
 ];
 
 $filter_form = new filter_form(null, $filter);
@@ -41,8 +43,8 @@ $redirect_url = new moodle_url($PAGE->url, array_merge($filter, ['page' => $page
 
 $finder = new finder($DB, $USER->id, $is_admin);
 $items = $finder->find($limit, $page * $limit, $filter);
-$totalItems = $finder->count($filter);
-$maxItems = pow(10, 3) * ($page + 1);
+$total_items = $finder->count($filter);
+$max_items = pow(10, 3) * ($page + 1);
 
 $table = new html_table();
 $table->head = [
@@ -89,6 +91,18 @@ while ($items->valid()) {
         );
     }
 
+    if (!$item->user_deleted) {
+        $user = html_writer::link(
+            new moodle_url('/user/profile.php', ['id' => $item->userid]),
+            fullname($item),
+            [
+                'target' => '_blank'
+            ]
+        );
+    } else {
+        $user = html_writer::tag('del', fullname($item));
+    }
+
     $table->data[] = [
         $item->filename,
         sprintf('%s, %s', $item->component, $item->filearea),
@@ -97,13 +111,7 @@ while ($items->valid()) {
             $item->filesize / pow(1024, 2),
             get_string('sizemb')
         ),
-        html_writer::link(
-            new moodle_url('/user/profile.php', ['id' => $item->userid]),
-            fullname($item),
-            [
-                'target' => '_blank'
-            ]
-        ),
+        $user,
         date('Y-m-d H:i', $item->timecreated),
         implode(' ', $actions)
     ];
@@ -112,7 +120,7 @@ while ($items->valid()) {
 }
 
 $pagination = $OUTPUT->paging_bar(
-    $totalItems > $maxItems ? $maxItems : $totalItems,
+    $total_items > $max_items ? $max_items : $total_items,
     $page,
     $limit,
     new moodle_url($PAGE->url, $filter)
@@ -123,6 +131,10 @@ echo $OUTPUT->header();
 $filter_form->display();
 
 if (count($table->data) !== 0) {
+    echo html_writer::tag(
+        'p',
+        get_string('files_total', 'local_cleanup') . ': ' . $total_items
+    );
     echo html_writer::table($table);
 } else {
     echo $OUTPUT->notification(get_string('nothingtoshow', 'local_cleanup'));
