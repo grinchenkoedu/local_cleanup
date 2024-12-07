@@ -23,7 +23,7 @@
 defined('MOODLE_INTERNAL') || die('Direct access to this script is forbidden.'); 
 
 $plugin->component = 'local_cleanup';
-$plugin->version =  2023061000;
+$plugin->version =  2024120400;
 $plugin->maturity = MATURITY_STABLE;
-$plugin->release = '1.3';
-$plugin->requires = 2017111300; // >= Moodle 3.4, PHP >= 7.0
+$plugin->release = '1.4';
+$plugin->requires = 2022041200; // Moodle 4.1 (LTS)

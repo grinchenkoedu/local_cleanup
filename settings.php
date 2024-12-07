@@ -60,7 +60,7 @@ if ($hassiteconfig) {
             'cleanup_backup_timeout',
             get_string('backuplifetime', 'local_cleanup'),
             get_string('backuplifetimedesc', 'local_cleanup'),
-            local_cleanup\task\cleanup::SECONDS_MONTH,
+            local_cleanup\task\cleanup::SECONDS_IN_MONTH,
             PARAM_INT
         )
     );
@@ -70,7 +70,7 @@ if ($hassiteconfig) {
             'cleanup_draft_timeout',
             get_string('draftlifetime', 'local_cleanup'),
             get_string('draftlifetimedesc', 'local_cleanup'),
-            local_cleanup\task\cleanup::SECONDS_MONTH,
+            local_cleanup\task\cleanup::SECONDS_IN_MONTH,
             PARAM_INT
         )
     );
@@ -81,6 +81,15 @@ if ($hassiteconfig) {
             get_string('autoremove', 'local_cleanup'),
             get_string('autoremovedesc', 'local_cleanup'),
             1 //enabled by default.
+        )
+    );
+
+    $settings->add(
+        new admin_setting_configcheckbox(
+            'cleanup_delete_course_modules',
+            get_string('deletecoursemodules', 'local_cleanup'),
+            get_string('deletecoursemodulesdesc', 'local_cleanup'),
+            0 //disabled by default.
         )
     );
 }
