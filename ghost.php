@@ -20,15 +20,14 @@ $PAGE->set_pagelayout('admin');
 
 require_login();
 
-$task = task_manager::get_scheduled_task(cleanup::class);
-
-$page = optional_param('page', 0, PARAM_INT);
-$limit = 250;
-
 if (!is_siteadmin()) {
     header('HTTP/1.1 403 Forbidden');
-    exit();
+    exit('Forbidden!');
 }
+
+$task = task_manager::get_scheduled_task(cleanup::class);
+$page = optional_param('page', 0, PARAM_INT);
+$limit = 250;
 
 $items = $DB->get_recordset('cleanup', [], 'size DESC', '*', $page * $limit, $limit);
 $total_items = $DB->count_records('cleanup');

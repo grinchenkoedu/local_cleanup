@@ -20,13 +20,13 @@ $PAGE->set_pagelayout('default');
 
 require_login();
 
-$id = optional_param('id', 0, PARAM_INT);
-$file = $DB->get_record('files', ['id' => $id], '*', MUST_EXIST);
-
 if (!is_siteadmin()) {
     header('HTTP/1.1 403 Forbidden');
     exit('Forbidden!');
 }
+
+$id = optional_param('id', 0, PARAM_INT);
+$file = $DB->get_record('files', ['id' => $id], '*', MUST_EXIST);
 
 $redirect_url = new moodle_url(optional_param('redirect', '/local/cleanup/files.php', PARAM_TEXT));
 

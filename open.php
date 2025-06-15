@@ -5,6 +5,13 @@
 
 require_once(__DIR__ . '/../../config.php');
 
+require_login();
+
+if (!is_siteadmin()) {
+    header('HTTP/1.1 403 Forbidden');
+    exit('Forbidden!');
+}
+
 $id = optional_param('id', 0, PARAM_INT);
 
 $file = $DB->get_record('files', ['id' => $id], '*', MUST_EXIST);
