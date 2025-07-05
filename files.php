@@ -21,6 +21,11 @@ $PAGE->set_pagelayout('admin');
 
 require_login();
 
+if (!is_siteadmin()) {
+    header('HTTP/1.1 403 Forbidden');
+    exit('Forbidden!');
+}
+
 $page = optional_param('page', 0, PARAM_INT);
 $limit = $CFG->cleanup_items_per_page ?? finder::LIMIT_DEFAULT;
 
@@ -38,10 +43,9 @@ if ($filter_form->is_cancelled()) {
     redirect($PAGE->url);
 }
 
-$is_admin = is_siteadmin();
 $redirect_url = new moodle_url($PAGE->url, array_merge($filter, ['page' => $page]));
 
-$finder = new finder($DB, $USER->id, $is_admin);
+$finder = new finder($DB);
 $items = $finder->find($limit, $page * $limit, $filter);
 $total_items = $finder->count($filter);
 $max_items = pow(10, 3) * ($page + 1);
@@ -84,12 +88,10 @@ while ($items->valid()) {
         );
     }
 
-    if ($item->userid === $USER->id || $is_admin) {
-        $actions[] = html_writer::link(
-            new moodle_url('/local/cleanup/remove.php', ['id' => $item->id, 'redirect' => $redirect_url]),
-            $OUTPUT->pix_icon('t/delete', get_string('delete'))
-        );
-    }
+    $actions[] = html_writer::link(
+        new moodle_url('/local/cleanup/remove.php', ['id' => $item->id, 'redirect' => $redirect_url]),
+        $OUTPUT->pix_icon('t/delete', get_string('delete'))
+    );
 
     if (!$item->user_deleted) {
         $user = html_writer::link(

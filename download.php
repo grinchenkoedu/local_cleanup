@@ -7,9 +7,11 @@
 require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir . '/filelib.php');
 
+require_login();
+
 if (!is_siteadmin()) {
     header('HTTP/1.1 403 Forbidden');
-    exit();
+    exit('Forbidden!');
 }
 
 $file_path = optional_param('path', 0, PARAM_TEXT);
@@ -20,7 +22,7 @@ if (!empty($file_path)) {
 
     if (!is_readable($absolute)) {
         header('HTTP/1.1 404 Not found');
-        exit();
+        exit('Not found!');
     }
 
     send_file($absolute, basename($absolute));
