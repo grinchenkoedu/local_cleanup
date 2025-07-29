@@ -53,6 +53,11 @@ class LogsCleanup extends AbstractCleanupStep
 
     private function cleanupLAnalyticsLogs(OutputInterface $output)
     {
+        if (!$this->db->get_manager()->table_exists('logstore_lanalytics_log')) {
+            $output->writeLine('Skipping cleanup of logstore_lanalytics_log: table does not exist.');
+            return;
+        }
+
         $sql = "SELECT l.id
                 FROM {logstore_lanalytics_log} l
                 LEFT JOIN {context} ctx ON ctx.id = l.contextid
