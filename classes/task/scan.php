@@ -3,18 +3,12 @@
 namespace local_cleanup\task;
 
 use core\task\scheduled_task;
+use moodle_database;
 
 class scan extends scheduled_task
 {
-    /**
-     * @var \moodle_database
-     */
-    private $db;
-
-    /**
-     * @var string
-     */
-    private $data_root;
+    private moodle_database $db;
+    private string $data_root;
 
     public function __construct()
     {
@@ -26,7 +20,7 @@ class scan extends scheduled_task
 
     public function get_name()
     {
-        return 'Scan for garbage';
+        return 'Scan for unlinked files';
     }
 
     public function execute()

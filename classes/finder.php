@@ -5,48 +5,20 @@ namespace local_cleanup;
 use dml_exception;
 use moodle_database;
 use moodle_recordset;
+use core_user\fields;
 
 class finder
 {
     const LIMIT_DEFAULT = 50;
 
-    /**
-     * @var moodle_database
-     */
-    private $db;
+    private moodle_database $db;
 
-    /**
-     * @var int
-     */
-    private $user_id;
-
-    /**
-     * @var bool
-     */
-    private $admin_mode;
-
-    /**
-     * @param moodle_database $db
-     * @param int $user_id
-     * @param false $admin_mode
-     */
-    public function __construct(moodle_database $db, $user_id, $admin_mode = false)
+    public function __construct(moodle_database $db)
     {
         $this->db = $db;
-        $this->user_id = $user_id;
-        $this->admin_mode = $admin_mode;
     }
 
-    /**
-     * @param int $limit
-     * @param int $offset
-     * @param array $filter
-     *
-     * @return moodle_recordset
-     *
-     * @throws dml_exception
-     */
-    public function find($limit = self::LIMIT_DEFAULT, $offset = 0, array $filter = [])
+    public function find(int $limit = self::LIMIT_DEFAULT, int $offset = 0, array $filter = []): moodle_recordset
     {
         return $this->db->get_recordset_sql(
             $this->get_search_sql($filter, false, $limit, $offset),
@@ -54,14 +26,7 @@ class finder
         );
     }
 
-    /**
-     * @param array $filter
-     *
-     * @return int
-     *
-     * @throws dml_exception
-     */
-    public function count(array $filter = [])
+    public function count(array $filter = []): int
     {
         return (int)$this->db->get_field_sql(
             $this->get_search_sql($filter, true),
@@ -70,35 +35,42 @@ class finder
     }
 
     /**
-     * @param string $component
-     *
+     * @param string $component Component name
+     * @param string|null $until Date string for filtering (e.g., '-1 year')
+     * @param bool $newer_than If true, get files newer than $until; if false, get files older than $until
+     * @param string|null $from Date string for filtering (e.g., '-2 years')
      * @return object {count: int, size: int (bytes)}
      *
      * @throws dml_exception
      */
-    public function stats(string $component, string $until = null)
+    public function stats(string $component, string $until = null, bool $newer_than = false, string $from = null)
     {
         $sql = '
             SELECT 
                 COUNT(f.id) as `count`,
-                SUM(f.filesize) as `size`
+                COALESCE(SUM(f.filesize), 0) as `size`
             FROM {files} f
             WHERE f.component = ?
         ';
 
-        if ($until !== null) {
-            $sql .= ' AND f.timecreated < ' . strtotime($until);
+        // For backup component, use timemodified instead of timecreated
+        $timeField = ($component === 'backup') ? 'f.timemodified' : 'f.timecreated';
+
+        // If both from and until are provided, get files in the specific time period
+        if ($from !== null && $until !== null) {
+            $from_timestamp = strtotime($from);
+            $until_timestamp = strtotime($until);
+            $sql .= " AND $timeField >= $from_timestamp AND $timeField < $until_timestamp";
+
+        } else if ($until !== null) {
+            $operator = $newer_than ? '>' : '<';
+            $sql .= " AND $timeField $operator " . strtotime($until);
         }
 
         return $this->db->get_record_sql($sql, [$component]);
     }
 
-    /**
-     * @param array $filter
-     *
-     * @return array
-     */
-    private function get_search_values(array $filter)
+    private function get_search_values(array $filter): array
     {
         $values = [];
 
@@ -117,18 +89,12 @@ class finder
         return $values;
     }
 
-    /**
-     * @param array $filter
-     * @param int $limit
-     * @param int $offset
-     * @param false $count
-     *
-     * @return string
-     *
-     * @throws dml_exception
-     */
-    private function get_search_sql(array $filter, $count = false, $limit = self::LIMIT_DEFAULT, $offset = 0)
-    {
+    private function get_search_sql(
+        array $filter, bool
+        $count = false,
+        int $limit = self::LIMIT_DEFAULT,
+        $offset = 0
+    ): string {
         $where = [
             sprintf('f.filesize > %d', ($filter['filesize'] ?? 0) * 1024 * 1024)
         ];
@@ -151,14 +117,6 @@ class finder
             $where[] = 'u.deleted = 1';
         }
 
-        if (!$this->admin_mode) {
-            $where[] = sprintf(
-                '(f.contextid IN (%s) OR f.userid = %d)',
-                implode(',', $this->get_allowed_contexts()),
-                $this->user_id
-            );
-        }
-
         if ($count) {
             return sprintf(
                 'SELECT COUNT(f.id) FROM {files} f LEFT JOIN {user} u ON f.userid = u.id WHERE %s',
@@ -166,27 +124,15 @@ class finder
             );
         }
 
+        $userFields = fields::for_name()
+            ->get_sql('u', false, '', '', false)
+            ->selects;
+
         return sprintf(
             'SELECT %s FROM {files} f LEFT JOIN {user} u ON f.userid = u.id WHERE %s GROUP BY f.contenthash %s',
-            'f.*, u.deleted as user_deleted, ' . get_all_user_name_fields(true, 'u'),
+            'f.*, u.deleted as user_deleted, ' . $userFields,
             implode(' AND ', $where),
             $offset > 0 ? sprintf('LIMIT %d, %d', $offset, $limit) : sprintf('LIMIT %d', $limit)
         );
-    }
-
-    /**
-     * @return string[]|int[]
-     *
-     * @throws dml_exception
-     */
-    private function get_allowed_contexts()
-    {
-        $ids = $this->db->get_fieldset_select(
-            'role_assignments',
-            'contextid',
-            sprintf('userid = %d GROUP BY contextid', $this->user_id)
-        );
-
-        return count($ids) < 1 ? [0] : $ids;
     }
 }

@@ -1,47 +1,82 @@
-# Moodle clean-up plugin
+# Moodle Clean-up Plugin
 
-Main features:
-* big files lookup and removal
-* trash files auto-removal (files not related to any moodle entity, configurable)
-* draft files auto-removal (configurable)
-* temporary files auto-removal
-* submissions disk usage statistics and batch removal
+A comprehensive Moodle plugin that manages and optimizes file storage and the database by automatically identifying and 
+removing unnecessary files and records.
+
+## Key Features
+
+* UI to find and remove large files
+* Automatic removal of orphaned files (files not associated with any Moodle entity, configurable)
+* Automatic removal of old submissions and backups (configurable)
+* Automatic grades history clean-up (configurable)
+* Automatic logs clean-up (configurable)
 
 ## Requirements
-Moodle 4.1.x (probably works with newer versions but not tested!)
 
-## How to use?
-1. Install (copy files to `/local/cleanup` and update Moodle)
-2. Open the "Administration" menu
-3. Open the "Clean-up" menu
-4. Open "Files" to review and search uploaded files
-5. Open "Ghost files" to check "lost and found" files, ready for auto removal
-6. Open "Statistics" to check total size of submissions and initiate batch removal
+* Moodle 4.1.x or newer (compatibility with newer versions not fully tested)
 
-## Cron tasks
-The auto clean-up functionality depends on the plugin tasks, please ensure that the crontab is configured to run moodle tasks:
+## Installation and Usage
+
+1. Install the plugin by copying all files to the `/local/cleanup` directory in your Moodle installation
+2. Run the Moodle upgrade process
+3. Ensure correct plugin settings: auto-remove, logs and files lifetime
+4. Access the plugin pages through:
+   * Administration → Clean-up → Files - to review and manage uploaded files
+   * Administration → Clean-up → Unlinked files - to identify and manage orphaned files
+
+## Cron Tasks
+
+The automatic clean-up functionality relies on properly configured Moodle cron tasks. Ensure your crontab includes:
+
 ```
 * * * * * /usr/bin/run-one /usr/bin/php $MOODLE_DIR/admin/cli/cron.php --execute
 ```
-Auto clean-up can be disabled in the plugin settings.
 
-## Course modules clean-up
-When you stuck with the course modules removal ("deletion in progress" issue), that maybe related to missing or corrupted 
-removal adhoc tasks.
+> [!IMPORTANT]
+> For large databases, it is *strongly recommended* to run the cleanup during off-peak hours as dedicated cron jobs. 
+> When using this approach, make sure to disable the corresponding tasks in the Moodle scheduled tasks (admin panel).
 
-First ensure that you properly set up the adhoc cron job e.g.:
+### Manual Start
+```sh
+# To scan the file directory for orphaned files (no removal)
+php admin/cli/scheduled_task.php --execute="local_cleanup\task\scan"
+# To execute database and files clean-up
+php admin/cli/scheduled_task.php --execute="local_cleanup\task\cleanup"
+```
+
+### Recommended Moodle Built-in Maintenance Tasks
+
+For optimal system maintenance, consider running these built-in Moodle tasks:
+
+```sh
+# Look for more clean-up tasks in the cron configuration
+php admin/cli/scheduled_task.php --execute="core\task\context_cleanup_task"
+php admin/cli/scheduled_task.php --execute="core\task\file_temp_cleanup_task"
+php admin/cli/scheduled_task.php --execute="core\task\file_trash_cleanup_task"
+# To fix other database issues
+php admin/cli/fix_course_sequence.php
+php admin/cli/fix_deleted_users.php
+php admin/cli/fix_orphaned_calendar_events.php
+php admin/cli/fix_orphaned_question_categories.php
+php admin/cli/check_database_schema.php
+```
+
+## Course Module Clean-up
+
+If you encounter issues with course modules stuck in "deletion in progress" state, this may be related to missing or corrupted removal tasks.
+
+### Prerequisites
+
+Ensure you have properly configured the adhoc task cron job:
+
 ```
 * * * * * /usr/bin/run-one /usr/bin/php $MOODLE_DIR/admin/cli/adhoc_task.php --execute
 ```
 
-To re-init the clean-up process run the following script:
+### Manual fix
+
+Run the following script to reinitialize the clean-up process:
 ```bash
 php $MOODLE_DIR/local/cleanup/cli/reinit_modules_cleanup.php
 ```
-The script will remove exising removal tasks and create new for every course module selected for removal.
-
-Additionally enable course module deletion in the plugin settings. Check cron logs for additional info.
-
-## Q&A
-**Q**: I don't want to remove backup or draft files automatically, can I disable this feature?
-**A**: Yes and no. You can set the lifetime setting to something like 10 years.
+This script removes existing removal tasks and creates new ones for each course module marked for deletion.
