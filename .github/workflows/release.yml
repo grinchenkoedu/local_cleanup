@@ -1,0 +1,211 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - master
+      - main
+  release:
+    types: [published]
+
+jobs:
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.3'
+        extensions: intl, json, curl, zip, gd, mbstring, xml
+        coverage: none
+        
+    - name: Validate version.php
+      run: |
+        # Extract version from tag
+        TAG_VERSION=${GITHUB_REF#refs/tags/v}
+        echo "Tag version: $TAG_VERSION"
+        
+        # Extract version from version.php (format: YYYYMMDDXX)
+        PHP_VERSION=$(grep '$plugin->version' version.php | grep -oE '[0-9]+')
+        echo "PHP version: $PHP_VERSION"
+        
+        # Extract release version from version.php
+        RELEASE_VERSION=$(grep '$plugin->release' version.php | grep -oE "'[^']+'" | tr -d "'")
+        echo "Release version: $RELEASE_VERSION"
+        
+        # Validate that tag matches release version
+        if [ "$TAG_VERSION" != "$RELEASE_VERSION" ]; then
+          echo "ERROR: Tag version ($TAG_VERSION) doesn't match release version ($RELEASE_VERSION) in version.php"
+          exit 1
+        fi
+        
+        echo "Version validation passed"
+        
+    - name: Check changelog
+      run: |
+        if [ ! -f "CHANGELOG.md" ]; then
+          echo "WARNING: No CHANGELOG.md found"
+        else
+          # Check if current version is documented
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          # Look for version in changelog (supports both [2.1] and 2.1 formats)
+          if ! grep -qE "\[$TAG_VERSION\]|## $TAG_VERSION" CHANGELOG.md; then
+            echo "WARNING: Version $TAG_VERSION not found in CHANGELOG.md"
+            echo "Looking for patterns: [$TAG_VERSION] or ## $TAG_VERSION"
+          else
+            echo "✅ Version $TAG_VERSION found in CHANGELOG.md"
+          fi
+        fi
+
+  create-package:
+    name: Create Release Package
+    runs-on: ubuntu-latest
+    needs: validate-release
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Create release package
+      run: |
+        # Create a clean package without development files
+        mkdir -p release-package/local_cleanup
+        
+        # Copy essential files
+        rsync -av \
+          --exclude='.git*' \
+          --exclude='.github/' \
+          --exclude='node_modules/' \
+          --exclude='vendor/' \
+          --exclude='*.md' \
+          --exclude='composer.*' \
+          --exclude='package*.json' \
+          --exclude='*.yml' \
+          --exclude='*.yaml' \
+          --exclude='phpstan.neon' \
+          --exclude='psalm.xml' \
+          . release-package/local_cleanup/
+          
+        # Create archive
+        cd release-package
+        tar -czf ../moodle-local_cleanup-${GITHUB_REF#refs/tags/}.tar.gz local_cleanup/
+        zip -r ../moodle-local_cleanup-${GITHUB_REF#refs/tags/}.zip local_cleanup/
+        cd ..
+        
+        # Generate checksums
+        sha256sum moodle-local_cleanup-${GITHUB_REF#refs/tags/}.tar.gz > checksums.txt
+        sha256sum moodle-local_cleanup-${GITHUB_REF#refs/tags/}.zip >> checksums.txt
+        
+    - name: Upload release artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-packages
+        path: |
+          moodle-local_cleanup-*.tar.gz
+          moodle-local_cleanup-*.zip
+          checksums.txt
+
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: create-package
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: release-packages
+        
+    - name: Extract release notes
+      id: release_notes
+      run: |
+        TAG_VERSION=${GITHUB_REF#refs/tags/v}
+        
+        if [ -f "CHANGELOG.md" ]; then
+          # Extract release notes for this version from CHANGELOG.md
+          awk "/^## \[$TAG_VERSION\]|^## $TAG_VERSION/{flag=1; next} /^## /{flag=0} flag" CHANGELOG.md > release_notes.txt
+          
+          if [ -s release_notes.txt ]; then
+            echo "Found release notes in CHANGELOG.md"
+          else
+            echo "No specific release notes found, using default"
+            echo "Release $TAG_VERSION of Moodle Clean-up Plugin" > release_notes.txt
+          fi
+        else
+          echo "Release $TAG_VERSION of Moodle Clean-up Plugin" > release_notes.txt
+          echo "" >> release_notes.txt
+          echo "See commit history for changes in this release." >> release_notes.txt
+        fi
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: release_notes.txt
+        files: |
+          moodle-local_cleanup-*.tar.gz
+          moodle-local_cleanup-*.zip
+          checksums.txt
+        draft: false
+        prerelease: ${{ contains(github.ref, '-') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  moodle-plugins-db:
+    name: Submit to Moodle Plugins Database
+    runs-on: ubuntu-latest
+    needs: github-release
+    if: github.event_name == 'release' && github.event.action == 'published'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Prepare submission info
+      run: |
+        echo "Plugin submission to Moodle Plugins Database would happen here"
+        echo "This requires:"
+        echo "1. Account on moodle.org"
+        echo "2. Plugin registered in the database"
+        echo "3. API access configured"
+        echo ""
+        echo "Manual steps:"
+        echo "1. Go to https://moodle.org/plugins/"
+        echo "2. Log in to your account"
+        echo "3. Navigate to your plugin page"
+        echo "4. Upload the new version package"
+        echo "5. Fill in the release notes"
+        echo "6. Submit for approval"
+
+  notify:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [github-release]
+    if: always()
+    
+    steps:
+    - name: Notify success
+      if: needs.github-release.result == 'success'
+      run: |
+        echo "✅ Release completed successfully!"
+        echo "Version: ${GITHUB_REF#refs/tags/}"
+        echo "Available at: https://github.com/${{ github.repository }}/releases/latest"
+        
+    - name: Notify failure  
+      if: needs.github-release.result == 'failure'
+      run: |
+        echo "❌ Release failed!"
+        echo "Check the workflow logs for details."
+        exit 1

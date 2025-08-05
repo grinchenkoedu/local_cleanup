@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="local/cleanup/db" VERSION="20250807" COMMENT="XMLDB file for Moodle local/cleanup"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
+>
+  <TABLES>
+    <TABLE NAME="local_cleanup_files" COMMENT="Table for storing cleanup scan results">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="path" TYPE="char" LENGTH="255" NOTNULL="true" COMMENT="File path"/>
+        <FIELD NAME="mime" TYPE="char" LENGTH="255" NOTNULL="true" COMMENT="MIME type"/>
+        <FIELD NAME="size" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="File size in bytes"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+    </TABLE>
+  </TABLES>
+</XMLDB>

@@ -1,42 +1,37 @@
 <?php
-
-defined('MOODLE_INTERNAL') || die('Direct access to this script is forbidden.');
+// This file is part of Moodle - https://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * @param int $oldversion
+ * Database upgrade script for local_cleanup plugin.
  *
- * @return bool
+ * @package    local_cleanup
+ * @copyright  2024 Grinchenko University
+ * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ *
+ * @param int $oldversion The old version number
+ *
+ * @return bool Success status
  *
  * @throws coding_exception
  * @throws ddl_exception
  */
-function xmldb_local_cleanup_upgrade($oldversion = 0)
-{
+function xmldb_local_cleanup_upgrade($oldversion = 0) {
     global $DB;
 
     $manager = $DB->get_manager();
-
-    if ($oldversion < 2020020701) {
-        $cleanup_table = new xmldb_table('cleanup');
-        $cleanup_table->add_field(
-            'id',
-            XMLDB_TYPE_INTEGER,
-            '10',
-            true,
-            XMLDB_NOTNULL,
-            XMLDB_SEQUENCE
-        );
-
-        $cleanup_table->add_field('path', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL);
-        $cleanup_table->add_field('mime', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL);
-        $cleanup_table->add_field('size', XMLDB_TYPE_INTEGER, '10', true, XMLDB_NOTNULL);
-
-        $primary = new xmldb_key('primary');
-        $primary->set_attributes(XMLDB_KEY_PRIMARY, ['id']);
-        $cleanup_table->addKey($primary);
-
-        $manager->create_table($cleanup_table);
-    }
 
     if ($oldversion < 2023061000) {
         $table = new xmldb_table('files');
@@ -52,6 +47,19 @@ function xmldb_local_cleanup_upgrade($oldversion = 0)
             $table,
             new xmldb_index('component_timecreated', XMLDB_INDEX_NOTUNIQUE, ['component', 'timecreated'])
         );
+
+        upgrade_plugin_savepoint(true, 2023061000, 'local', 'cleanup');
+    }
+
+    if ($oldversion < 2025080700) {
+        $oldtable = new xmldb_table('cleanup');
+        $newtable = new xmldb_table('local_cleanup_files');
+
+        if ($manager->table_exists($oldtable) && !$manager->table_exists($newtable)) {
+            $manager->rename_table($oldtable, 'local_cleanup_files');
+        }
+
+        upgrade_plugin_savepoint(true, 2025080700, 'local', 'cleanup');
     }
 
     return true;

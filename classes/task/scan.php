@@ -1,39 +1,89 @@
 <?php
+// This file is part of Moodle - https://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 namespace local_cleanup\task;
 
 use core\task\scheduled_task;
 use moodle_database;
 
-class scan extends scheduled_task
-{
-    private moodle_database $db;
-    private string $data_root;
+/**
+ * Scheduled task for scanning unlinked files.
+ *
+ * Scans the file system for files that are not referenced in the database.
+ *
+ * @package    local_cleanup
+ * @copyright  2024 Grinchenko University
+ * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class scan extends scheduled_task {
 
-    public function __construct()
-    {
+    /**
+     * Database connection.
+     *
+     * @var moodle_database
+     */
+    private $db;
+
+    /**
+     * Moodle data root directory path.
+     *
+     * @var string
+     */
+    private $dataroot;
+
+    /**
+     * Constructor.
+     */
+    public function __construct() {
         global $DB, $CFG;
 
         $this->db = $DB;
-        $this->data_root = $CFG->dataroot;
+        $this->dataroot = $CFG->dataroot;
     }
 
-    public function get_name()
-    {
+    /**
+     * Get the name of the task.
+     *
+     * @return string The name of the task
+     */
+    public function get_name() {
         return 'Scan for unlinked files';
     }
 
-    public function execute()
-    {
-        $sizeTotal = $this->scanRecursive('filedir');
+    /**
+     * Execute the task.
+     *
+     * Scans for unlinked files and reports the total size found.
+     */
+    public function execute() {
+        $sizetotal = $this->scanRecursive('filedir');
 
-        mtrace(sprintf('Total found: %.3f GB', $sizeTotal / 1024 / 1024 / 1024));
+        mtrace(sprintf('Total found: %.3f GB', $sizetotal / 1024 / 1024 / 1024));
     }
 
-    private function scanRecursive(string $path, bool $printProgress = true): int
-    {
-        $size_total = 0;
-        $absolute = $this->data_root . DIRECTORY_SEPARATOR . $path;
+    /**
+     * Recursively scan a directory for unlinked files.
+     *
+     * @param string $path Relative path to scan
+     * @param bool $printprogress Whether to print progress information
+     * @return int Total size of unlinked files found in bytes
+     */
+    private function scanrecursive(string $path, bool $printprogress = true): int {
+        $sizetotal = 0;
+        $absolute = $this->dataroot . DIRECTORY_SEPARATOR . $path;
         $list = scandir($absolute);
 
         foreach ($list as $index => $item) {
@@ -41,18 +91,18 @@ class scan extends scheduled_task
                 continue;
             }
 
-            $itemPath = $absolute . DIRECTORY_SEPARATOR . $item;
+            $itempath = $absolute . DIRECTORY_SEPARATOR . $item;
 
-            if (is_dir($itemPath)) {
-                if ($printProgress) {
+            if (is_dir($itempath)) {
+                if ($printprogress) {
                     mtrace(sprintf(
                         'Searching in "%s" (%d%%)...',
-                        $itemPath,
+                        $itempath,
                         ($index * 100) / count($list)
                     ));
                 }
 
-                $size_total += $this->scanRecursive($path . DIRECTORY_SEPARATOR . $item, false);
+                $sizetotal += $this->scanRecursive($path . DIRECTORY_SEPARATOR . $item, false);
 
                 continue;
             }
@@ -60,33 +110,39 @@ class scan extends scheduled_task
             $record = $this->db->get_record('files', ['contenthash' => $item], 'id', IGNORE_MULTIPLE);
 
             if (empty($record)) {
-                $size = filesize($itemPath);
-                $size_total += $size;
-                $mime = mime_content_type($itemPath);
+                $size = filesize($itempath);
+                $sizetotal += $size;
+                $mime = mime_content_type($itempath);
 
                 $this->insert($path . DIRECTORY_SEPARATOR . $item, $mime, $size);
 
                 mtrace(
                     sprintf(
                         'Record NOT found for file "%s", added for removal.',
-                        $itemPath
+                        $itempath
                     )
                 );
             }
         }
 
-        return $size_total;
+        return $sizetotal;
     }
 
-    private function insert($path, $mime, $size)
-    {
-        $existing = $this->db->get_record('cleanup', ['path' => $path]);
+    /**
+     * Insert or update a record in the local_cleanup_files table.
+     *
+     * @param string $path File path relative to dataroot
+     * @param string $mime MIME type of the file
+     * @param int $size Size of the file in bytes
+     */
+    private function insert($path, $mime, $size) {
+        $existing = $this->db->get_record('local_cleanup_files', ['path' => $path]);
 
         if (!empty($existing)) {
             $existing->mime = $mime;
             $existing->size = $size;
 
-            $this->db->update_record('cleanup', $existing);
+            $this->db->update_record('local_cleanup_files', $existing);
 
             return;
         }
@@ -94,9 +150,9 @@ class scan extends scheduled_task
         $data = [
             'path' => $path,
             'mime' => $mime,
-            'size' => $size
+            'size' => $size,
         ];
 
-        $this->db->insert_record('cleanup', (object)$data);
+        $this->db->insert_record('local_cleanup_files', (object)$data);
     }
 }
