@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - '*'
     branches:
       - master
       - main
@@ -14,7 +14,7 @@ jobs:
   validate-release:
     name: Validate Release
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
     
     steps:
     - name: Checkout code
@@ -30,7 +30,7 @@ jobs:
     - name: Validate version.php
       run: |
         # Extract version from tag
-        TAG_VERSION=${GITHUB_REF#refs/tags/v}
+        TAG_VERSION=${GITHUB_REF#refs/tags/}
         echo "Tag version: $TAG_VERSION"
         
         # Extract version from version.php (format: YYYYMMDDXX)
@@ -55,7 +55,7 @@ jobs:
           echo "WARNING: No CHANGELOG.md found"
         else
           # Check if current version is documented
-          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          TAG_VERSION=${GITHUB_REF#refs/tags/}
           # Look for version in changelog (supports both [2.1] and 2.1 formats)
           if ! grep -qE "\[$TAG_VERSION\]|## $TAG_VERSION" CHANGELOG.md; then
             echo "WARNING: Version $TAG_VERSION not found in CHANGELOG.md"
@@ -69,7 +69,7 @@ jobs:
     name: Create Release Package
     runs-on: ubuntu-latest
     needs: validate-release
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
     
     steps:
     - name: Checkout code
@@ -132,7 +132,7 @@ jobs:
     - name: Extract release notes
       id: release_notes
       run: |
-        TAG_VERSION=${GITHUB_REF#refs/tags/v}
+        TAG_VERSION=${GITHUB_REF#refs/tags/}
         
         if [ -f "CHANGELOG.md" ]; then
           # Extract release notes for this version from CHANGELOG.md
