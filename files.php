@@ -1,10 +1,30 @@
 <?php
+// This file is part of Moodle - https://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+
 /**
- * @global moodle_page $PAGE
- * @global moodle_database $DB
- * @global stdClass $USER
- * @global stdClass $CFG
- * @global renderer_base $OUTPUT
+ * Files management page for cleanup plugin.
+ *
+ * @package    local_cleanup
+ * @copyright  2024 Grinchenko University
+ * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @var moodle_page $PAGE
+ * @var moodle_database $DB
+ * @var stdClass $USER
+ * @var stdClass $CFG
+ * @var renderer_base $OUTPUT
  */
 
 require_once(__DIR__ . '/../../config.php');
@@ -37,18 +57,18 @@ $filter = [
     'user_deleted' => optional_param('user_deleted', '', PARAM_TEXT),
 ];
 
-$filter_form = new filter_form(null, $filter);
+$filterform = new filter_form(null, $filter);
 
-if ($filter_form->is_cancelled()) {
+if ($filterform->is_cancelled()) {
     redirect($PAGE->url);
 }
 
-$redirect_url = new moodle_url($PAGE->url, array_merge($filter, ['page' => $page]));
+$redirecturl = new moodle_url($PAGE->url, array_merge($filter, ['page' => $page]));
 
 $finder = new finder($DB);
 $items = $finder->find($limit, $page * $limit, $filter);
-$total_items = $finder->count($filter);
-$max_items = pow(10, 3) * ($page + 1);
+$totalitems = $finder->count($filter);
+$maxitems = pow(10, 3) * ($page + 1);
 
 $table = new html_table();
 $table->head = [
@@ -57,7 +77,7 @@ $table->head = [
     get_string('size'),
     get_string('user', 'admin'),
     get_string('date'),
-    ''
+    '',
 ];
 
 $table->size = ['30%', '15%', '10%', '30%', '15%', '1%'];
@@ -82,14 +102,14 @@ while ($items->valid()) {
                 new moodle_url('/local/cleanup/open.php', ['id' => $item->id]),
                 $OUTPUT->pix_icon('i/preview', get_string('view')),
                 [
-                    'target' => '_blank'
+                    'target' => '_blank',
                 ]
             )
         );
     }
 
     $actions[] = html_writer::link(
-        new moodle_url('/local/cleanup/remove.php', ['id' => $item->id, 'redirect' => $redirect_url]),
+        new moodle_url('/local/cleanup/remove.php', ['id' => $item->id, 'redirect' => $redirecturl]),
         $OUTPUT->pix_icon('t/delete', get_string('delete'))
     );
 
@@ -98,7 +118,7 @@ while ($items->valid()) {
             new moodle_url('/user/profile.php', ['id' => $item->userid]),
             fullname($item),
             [
-                'target' => '_blank'
+                'target' => '_blank',
             ]
         );
     } else {
@@ -115,14 +135,14 @@ while ($items->valid()) {
         ),
         $user,
         date('Y-m-d H:i', $item->timecreated),
-        implode(' ', $actions)
+        implode(' ', $actions),
     ];
 
     $items->next();
 }
 
 $pagination = $OUTPUT->paging_bar(
-    $total_items > $max_items ? $max_items : $total_items,
+    $totalitems > $maxitems ? $maxitems : $totalitems,
     $page,
     $limit,
     new moodle_url($PAGE->url, $filter)
@@ -130,12 +150,12 @@ $pagination = $OUTPUT->paging_bar(
 
 echo $OUTPUT->header();
 
-$filter_form->display();
+$filterform->display();
 
 if (count($table->data) !== 0) {
     echo html_writer::tag(
         'p',
-        get_string('files_total', 'local_cleanup') . ': ' . $total_items
+        get_string('files_total', 'local_cleanup') . ': ' . $totalitems
     );
     echo html_writer::table($table);
 } else {

@@ -15,16 +15,21 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * @author Yevhen Matasar <matasar.ei@gmail.com>
+ * Plugin version and other meta-data are defined here.
+ *
+ * @package    local_cleanup
+ * @copyright  2024 Grinchenko University
+ * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @author     Yevhen Matasar <matasar.ei@gmail.com>
  *
  * @var $plugin stdClass
  */
 
-defined('MOODLE_INTERNAL') || die('Direct access to this script is forbidden.'); 
+defined('MOODLE_INTERNAL') || die('Direct access to this script is forbidden.');
 
 $plugin->component = 'local_cleanup';
-$plugin->version = 2025080200;
+$plugin->version = 2025080700;
 $plugin->maturity = MATURITY_STABLE;
-$plugin->release = '2.1';
-$plugin->requires = 2022041200; // Moodle 4.1 (LTS)
+$plugin->release = '2.2';
+$plugin->requires = 2022041200; // Moodle 4.1 (LTS).
 $plugin->phpversion = '7.4.0';

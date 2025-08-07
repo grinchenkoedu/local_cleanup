@@ -1,10 +1,31 @@
 <?php
+// This file is part of Moodle - https://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+
 /**
- * @global stdClass $CFG
- * @global stdClass $USER
- * @global moodle_page $PAGE
- * @global moodle_database $DB
- * @global renderer_base $OUTPUT
+ * File removal handler for the cleanup plugin.
+ *
+ * @package    local_cleanup
+ * @copyright  2024 Grinchenko University
+ * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @phpcs:ignore moodle.Commenting.ValidTags.Invalid
+ * @var stdClass $CFG
+ * @var stdClass $USER
+ * @var moodle_page $PAGE
+ * @var moodle_database $DB
+ * @var renderer_base $OUTPUT
  */
 
 require_once(__DIR__ . '/../../config.php');
@@ -28,7 +49,7 @@ if (!is_siteadmin()) {
 $id = optional_param('id', 0, PARAM_INT);
 $file = $DB->get_record('files', ['id' => $id], '*', MUST_EXIST);
 
-$redirect_url = new moodle_url(optional_param('redirect', '/local/cleanup/files.php', PARAM_TEXT));
+$redirecturl = new moodle_url(optional_param('redirect', '/local/cleanup/files.php', PARAM_TEXT));
 
 if (optional_param('confirm', false, PARAM_BOOL)) {
     $fs = get_file_storage();
@@ -43,10 +64,10 @@ if (optional_param('confirm', false, PARAM_BOOL)) {
             'size' => $file->get_filesize() / 1024 / 1024,
         ]
     );
-    $message_type = notification::SUCCESS;
+    $messagetype = notification::SUCCESS;
 
     if (!$resource) {
-        // looks like the file is missing, so just removing the record.
+        // Looks like the file is missing, so just removing the record.
         $DB->delete_records('files', ['contenthash' => $file->get_contenthash()]);
     } else {
         $uri = stream_get_meta_data($resource)['uri'];
@@ -59,14 +80,14 @@ if (optional_param('confirm', false, PARAM_BOOL)) {
                 'failtoremove',
                 'local_cleanup',
                 [
-                    'name' => $file->get_filename()
+                    'name' => $file->get_filename(),
                 ]
             );
-            $message_type = notification::ERROR;
+            $messagetype = notification::ERROR;
         }
     }
 
-    redirect($redirect_url, $message, 3, $message_type);
+    redirect($redirecturl, $message, 3, $messagetype);
 }
 
 echo $OUTPUT->header();
@@ -84,7 +105,7 @@ echo $OUTPUT->confirm(
         'id' => $id,
         'confirm' => 1,
     ]),
-    $redirect_url
+    $redirecturl
 );
 
 echo $OUTPUT->footer();

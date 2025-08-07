@@ -1,5 +1,8 @@
 # Moodle Clean-up Plugin
 
+[![Moodle Plugin CI](https://github.com/grinchenkoedu/local_cleanup/workflows/Moodle%20Plugin%20CI/badge.svg)](https://github.com/grinchenkoedu/local_cleanup/actions)
+[![Release](https://github.com/grinchenkoedu/local_cleanup/workflows/Release/badge.svg)](https://github.com/grinchenkoedu/local_cleanup/actions)
+
 A comprehensive Moodle plugin that manages and optimizes file storage and the database by automatically identifying and 
 removing unnecessary files and records.
 
