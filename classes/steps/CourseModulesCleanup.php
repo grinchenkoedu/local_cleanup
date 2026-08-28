@@ -30,7 +30,6 @@ use moodle_database;
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class CourseModulesCleanup implements CleanupStepInterface {
-
     /**
      * Default number of days to keep course modules.
      */
@@ -219,8 +218,14 @@ class CourseModulesCleanup implements CleanupStepInterface {
         }
 
         // Delete grade items, outcome items and grades attached to modules.
-        if ($gradeitems = \grade_item::fetch_all(['itemtype' => 'mod', 'itemmodule' => $modulename,
-            'iteminstance' => $cm->instance, 'courseid' => $cm->course])) {
+        $gradeitems = \grade_item::fetch_all([
+            'itemtype' => 'mod',
+            'itemmodule' => $modulename,
+            'iteminstance' => $cm->instance,
+            'courseid' => $cm->course,
+        ]);
+
+        if ($gradeitems) {
             foreach ($gradeitems as $gradeitem) {
                 $gradeitem->delete('moddelete');
             }
@@ -253,8 +258,13 @@ class CourseModulesCleanup implements CleanupStepInterface {
 
         // Delete module from that section.
         if (!delete_mod_from_section($cm->id, $cm->section)) {
-            throw new \moodle_exception('cannotdeletemodulefromsection', '', '', null,
-                "Cannot delete the module $modulename (instance) from section.");
+            throw new \moodle_exception(
+                'cannotdeletemodulefromsection',
+                '',
+                '',
+                null,
+                "Cannot delete the module $modulename (instance) from section."
+            );
         }
 
         // Trigger event for course module delete action.

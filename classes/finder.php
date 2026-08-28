@@ -29,7 +29,6 @@ use core_user\fields;
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class finder {
-
     /** Default limit for file queries */
     const LIMIT_DEFAULT = 50;
 
@@ -105,7 +104,6 @@ class finder {
             $fromtimestamp = strtotime($from);
             $untiltimestamp = strtotime($until);
             $sql .= " AND $timefield >= $fromtimestamp AND $timefield < $untiltimestamp";
-
         } else if ($until !== null) {
             $operator = $newerthan ? '>' : '<';
             $sql .= " AND $timefield $operator " . strtotime($until);
@@ -148,8 +146,8 @@ class finder {
      * @return string SQL query
      */
     private function get_search_sql(
-        array $filter, bool
-        $count = false,
+        array $filter,
+        bool $count = false,
         int $limit = self::LIMIT_DEFAULT,
         $offset = 0
     ): string {

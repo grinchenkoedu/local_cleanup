@@ -36,7 +36,6 @@ use moodle_database;
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class cleanup extends scheduled_task {
-
     /**
      * Array of cleanup steps to execute.
      *

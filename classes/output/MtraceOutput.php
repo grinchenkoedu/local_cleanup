@@ -24,7 +24,6 @@ namespace local_cleanup\output;
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class MtraceOutput implements OutputInterface {
-
     /**
      * Write a message without a line break.
      *

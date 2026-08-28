@@ -31,7 +31,6 @@ use stored_file;
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class FilesCheckout implements CleanupStepInterface {
-
     /**
      * Empty string for selecting all records.
      */
@@ -80,7 +79,7 @@ class FilesCheckout implements CleanupStepInterface {
      */
     public function __construct(
         moodle_database $db,
-        file_storage    $fs,
+        file_storage $fs,
         int $backuptimeoutdays = self::DEFAULT_TIMEOUT_DAYS,
         int $drafttimeoutdays = self::DEFAULT_TIMEOUT_DAYS
     ) {
@@ -172,10 +171,12 @@ class FilesCheckout implements CleanupStepInterface {
         ) {
             unlink($uri);
             $output->writeLine(
-                sprintf('Outdated draft "%s" (%s). Removed.',
+                sprintf(
+                    'Outdated draft "%s" (%s). Removed.',
                     $file->get_filename(),
                     $file->get_contenthash()
-                ));
+                )
+            );
 
             return false;
         }

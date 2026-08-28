@@ -75,7 +75,7 @@ foreach ($components as $component => $batchremoval) {
     ];
 
     foreach ($periods as $index => $period) {
-        list($from, $to) = $period;
+        [$from, $to] = $period;
 
         if ($from === null) {
             // Files newer than 1 year.
@@ -87,7 +87,8 @@ foreach ($components as $component => $batchremoval) {
             // Use the new functionality to directly query for files in the specific time period.
             $statsperiod = $finder->stats($component, $to, false, $from);
 
-            $perioddesc = sprintf("from %s to %s",
+            $perioddesc = sprintf(
+                "from %s to %s",
                 date('Y-m-d', strtotime($from)),
                 date('Y-m-d', strtotime($to))
             );
@@ -180,7 +181,7 @@ foreach ($tables as $table => $datetimefield) {
     ];
 
     foreach ($periods as $period) {
-        list($from, $to) = $period;
+        [$from, $to] = $period;
 
         if ($from === null) {
             // Records newer than 1 year.
@@ -202,7 +203,8 @@ foreach ($tables as $table => $datetimefield) {
 
             $sizeperiod = $count > 0 ? max(0, $size * ($countperiod / $count)) : 0;
 
-            $perioddesc = sprintf("from %s to %s",
+            $perioddesc = sprintf(
+                "from %s to %s",
                 date('Y-m-d', $fromcutoff),
                 date('Y-m-d', $tocutoff)
             );

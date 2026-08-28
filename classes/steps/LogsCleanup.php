@@ -29,7 +29,6 @@ use moodle_database;
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class LogsCleanup extends AbstractCleanupStep {
-
     /**
      * Default number of days to keep logs.
      */

@@ -26,7 +26,6 @@ use local_cleanup\output\OutputInterface;
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 interface CleanupStepInterface {
-
     /**
      * Execute the cleanup step.
      *
