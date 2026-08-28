@@ -171,8 +171,7 @@ class cleanup extends scheduled_task {
                 'backup',
             ], $this->componentfilesdays);
             $this->steps[] = new GhostFilesCleanup($this->db, $this->dataroot);
+            $this->steps[] = new FilesCheckout($this->db, $this->fs, $this->backuptimeout, $this->drafttimeout);
         }
-
-        $this->steps[] = new FilesCheckout($this->db, $this->fs, $this->backuptimeout, $this->drafttimeout);
     }
 }
