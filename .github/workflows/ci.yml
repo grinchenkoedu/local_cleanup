@@ -89,6 +89,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci savepoints
 
+      - name: PHPUnit tests
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpunit
+
       - name: Basic Security Check
         if: ${{ !cancelled() }}
         run: |

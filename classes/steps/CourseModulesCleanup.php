@@ -16,7 +16,7 @@
 
 namespace local_cleanup\steps;
 
-use Exception;
+use Throwable;
 use local_cleanup\output\OutputInterface;
 use moodle_database;
 
@@ -30,7 +30,6 @@ use moodle_database;
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class CourseModulesCleanup implements CleanupStepInterface {
-
     /**
      * Default number of days to keep course modules.
      */
@@ -93,7 +92,7 @@ class CourseModulesCleanup implements CleanupStepInterface {
             foreach ($customdata->cms as $cm) {
                 try {
                     $this->deleteCourseModule($cm->id, $output);
-                } catch (Exception $e) {
+                } catch (Throwable $e) {
                     $output->writeLine(sprintf('Failed to delete course module %d: %s', $cm->id, $e->getMessage()));
                     $success = false;
                 }
@@ -128,7 +127,13 @@ class CourseModulesCleanup implements CleanupStepInterface {
 
         try {
             course_delete_module($cm->id);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
+            // Deliberately broad. This step exists to finish deletions that are already
+            // failing, often because a module's delete_instance() is broken or its lib is
+            // gone, and such a module can raise anything at all - including an Error, which
+            // is not an Exception. Narrowing here would skip the manual clean-up below in
+            // exactly the cases it was written for. The moodle_exception check that follows
+            // is only meaningful because non-Moodle throwables reach this point.
             $output->writeLine('Failed: ' . $e->getMessage());
 
             if ($e instanceof \moodle_exception && $e->errorcode == 'cannotdeletemodulemissinglib') {
@@ -174,7 +179,7 @@ class CourseModulesCleanup implements CleanupStepInterface {
         foreach ($orphanedmodules as $cm) {
             try {
                 $this->deleteCourseModule($cm->id, $output);
-            } catch (Exception $e) {
+            } catch (Throwable $e) {
                 $output->writeLine(sprintf('Failed to delete orphaned course module %d: %s', $cm->id, $e->getMessage()));
             }
         }
@@ -213,8 +218,14 @@ class CourseModulesCleanup implements CleanupStepInterface {
         }
 
         // Delete grade items, outcome items and grades attached to modules.
-        if ($gradeitems = \grade_item::fetch_all(['itemtype' => 'mod', 'itemmodule' => $modulename,
-            'iteminstance' => $cm->instance, 'courseid' => $cm->course])) {
+        $gradeitems = \grade_item::fetch_all([
+            'itemtype' => 'mod',
+            'itemmodule' => $modulename,
+            'iteminstance' => $cm->instance,
+            'courseid' => $cm->course,
+        ]);
+
+        if ($gradeitems) {
             foreach ($gradeitems as $gradeitem) {
                 $gradeitem->delete('moddelete');
             }
@@ -247,8 +258,13 @@ class CourseModulesCleanup implements CleanupStepInterface {
 
         // Delete module from that section.
         if (!delete_mod_from_section($cm->id, $cm->section)) {
-            throw new \moodle_exception('cannotdeletemodulefromsection', '', '', null,
-                "Cannot delete the module $modulename (instance) from section.");
+            throw new \moodle_exception(
+                'cannotdeletemodulefromsection',
+                '',
+                '',
+                null,
+                "Cannot delete the module $modulename (instance) from section."
+            );
         }
 
         // Trigger event for course module delete action.

@@ -27,7 +27,6 @@ use moodle_database;
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 abstract class AbstractCleanupStep implements CleanupStepInterface {
-
     /**
      * Database connection.
      *

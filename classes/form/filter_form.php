@@ -26,7 +26,6 @@ use moodleform;
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class filter_form extends moodleform {
-
     /**
      * Define the form elements.
      */

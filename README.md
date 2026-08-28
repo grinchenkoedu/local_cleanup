@@ -27,6 +27,36 @@ removing unnecessary files and records.
    * Administration → Clean-up → Files - to review and manage uploaded files
    * Administration → Clean-up → Unlinked files - to identify and manage orphaned files
 
+## Database Indexes
+
+Earlier versions of this plugin added three indexes to the core `files` table from
+`db/upgrade.php`. A plugin must not own indexes on a core table — `check_database_schema()`
+reports them, so `php admin/cli/check_database_schema.php` flags every site running the plugin
+with `Unexpected index`.
+
+Version 2.3 drops `component`. That one is redundant: core's `files` table already defines
+`component-filearea-contextid-itemid`, whose leftmost column is `component`, so the same
+queries are served either way and dropping it costs nothing.
+
+Two are left in place for now, because they carry real weight on a large site and nothing has
+replaced them yet:
+
+| Index | Fields | Used by |
+|---|---|---|
+| `component_filesize` | `component, filesize` | the files report, when a component filter is set |
+| `component_timecreated` | `component, timecreated` | component files clean-up, usage statistics |
+
+Version 3.0 removes both, once the plugin maintains its own indexed table to query instead. If
+you still want them after that upgrade, a DBA can add them back deliberately — accepting that
+the site's schema will then differ from core, and that `check_database_schema.php` will say so:
+
+```sql
+CREATE INDEX mdl_file_comfil_ix ON mdl_files (component, filesize);
+CREATE INDEX mdl_file_comtim_ix ON mdl_files (component, timecreated);
+```
+
+Substitute your own `$CFG->prefix` for `mdl_` if it differs.
+
 ## Cron Tasks
 
 The automatic clean-up functionality relies on properly configured Moodle cron tasks. Ensure your crontab includes:
