@@ -108,3 +108,6 @@ styles.css
 
 # Claude Code toolkit (per-developer, not project state)
 .claude/repo-profile.json
+
+# Agent task briefs (per-developer, not project state)
+.tasks/
