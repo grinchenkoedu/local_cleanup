@@ -55,8 +55,16 @@ if (!$file) {
 }
 
 // Only a local URL is accepted, so the confirmation cannot be used to bounce off site.
+// PARAM_LOCALURL also passes bare relative URLs such as "files.php". moodle_url only resolves
+// a value against wwwroot when it starts with a slash, so a relative one stays relative and
+// out_as_local_url() below would reject it. Accept only the two forms that survive that.
 $redirect = optional_param('redirect', '', PARAM_LOCALURL);
-$redirecturl = new moodle_url(empty($redirect) ? '/local/cleanup/files.php' : $redirect);
+
+if (strpos($redirect, '/') !== 0 && strpos($redirect, $CFG->wwwroot) !== 0) {
+    $redirect = '/local/cleanup/files.php';
+}
+
+$redirecturl = new moodle_url($redirect);
 
 $filename = $file->get_filename();
 $filesize = $file->get_filesize();
