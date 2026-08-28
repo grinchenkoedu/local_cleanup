@@ -24,7 +24,6 @@
  * @var stdClass $CFG
  * @var stdClass $USER
  * @var moodle_page $PAGE
- * @var moodle_database $DB
  * @var renderer_base $OUTPUT
  */
 
@@ -46,45 +45,51 @@ if (!is_siteadmin()) {
     exit('Forbidden!');
 }
 
-$id = optional_param('id', 0, PARAM_INT);
-$file = $DB->get_record('files', ['id' => $id], '*', MUST_EXIST);
+$id = required_param('id', PARAM_INT);
 
-$redirecturl = new moodle_url(optional_param('redirect', '/local/cleanup/files.php', PARAM_TEXT));
+$fs = get_file_storage();
+$file = $fs->get_file_by_id($id);
+
+if (!$file) {
+    throw new moodle_exception('filenotfound', 'error');
+}
+
+// Only a local URL is accepted, so the confirmation cannot be used to bounce off site.
+$redirect = optional_param('redirect', '', PARAM_LOCALURL);
+$redirecturl = new moodle_url(empty($redirect) ? '/local/cleanup/files.php' : $redirect);
+
+$filename = $file->get_filename();
+$filesize = $file->get_filesize();
 
 if (optional_param('confirm', false, PARAM_BOOL)) {
-    $fs = get_file_storage();
-    $file = $fs->get_file_instance($file);
+    require_sesskey();
 
-    $resource = $fs->get_file_system()->get_content_file_handle($file);
-    $message = get_string(
-        'fileremoved',
-        'local_cleanup',
-        [
-            'name' => $file->get_filename(),
-            'size' => $file->get_filesize() / 1024 / 1024,
-        ]
-    );
-    $messagetype = notification::SUCCESS;
+    try {
+        // stored_file::delete() removes this record only. The content itself is kept when
+        // another record still references the same contenthash, and moved to the trash
+        // directory otherwise, so core's trash clean-up task provides a recovery window.
+        $file->delete();
 
-    if (!$resource) {
-        // Looks like the file is missing, so just removing the record.
-        $DB->delete_records('files', ['contenthash' => $file->get_contenthash()]);
-    } else {
-        $uri = stream_get_meta_data($resource)['uri'];
-        fclose($resource);
+        $message = get_string(
+            'fileremoved',
+            'local_cleanup',
+            [
+                'name' => $filename,
+                'size' => round($filesize / 1024 / 1024, 2),
+            ]
+        );
+        $messagetype = notification::SUCCESS;
+    } catch (Exception $e) {
+        debugging($e->getMessage(), DEBUG_DEVELOPER);
 
-        if (unlink($uri)) {
-            $DB->delete_records('files', ['contenthash' => $file->get_contenthash()]);
-        } else {
-            $message = get_string(
-                'failtoremove',
-                'local_cleanup',
-                [
-                    'name' => $file->get_filename(),
-                ]
-            );
-            $messagetype = notification::ERROR;
-        }
+        $message = get_string(
+            'failtoremove',
+            'local_cleanup',
+            [
+                'name' => $filename,
+            ]
+        );
+        $messagetype = notification::ERROR;
     }
 
     redirect($redirecturl, $message, 3, $messagetype);
@@ -97,13 +102,15 @@ echo $OUTPUT->confirm(
         '%s %s <b>%s</b>, %s %s?',
         get_string('remove'),
         mb_strtolower(get_string('file')),
-        $file->filename,
-        round($file->filesize / 1024 / 1024, 2),
+        s($filename),
+        round($filesize / 1024 / 1024, 2),
         get_string('sizemb')
     ),
     new moodle_url($PAGE->url, [
         'id' => $id,
         'confirm' => 1,
+        'redirect' => $redirecturl->out_as_local_url(false),
+        'sesskey' => sesskey(),
     ]),
     $redirecturl
 );
