@@ -130,7 +130,10 @@ class cleanup extends scheduled_task {
         $this->componentfilesdays = $CFG->cleanup_component_files_days ?? ComponentFilesCleanup::DEFAULT_LIFETIME_DAYS;
         $this->gradesdays = $CFG->cleanup_grades_days ?? GradesCleanup::DEFAULT_LIFETIME_DAYS;
         $this->coursemodulesdays = $CFG->cleanup_course_modules_days ?? CourseModulesCleanup::DEFAULT_LIFETIME_DAYS;
-        $this->isautoremoveenabled = (bool)$CFG->cleanup_run_autoremove ?? false;
+        // Read with empty() rather than a cast: the setting is absent until it is saved
+        // once, and (bool)$CFG->... evaluates the property before ?? can default it, so
+        // the cast emitted "Undefined property" and ?? never applied to a non-null bool.
+        $this->isautoremoveenabled = !empty($CFG->cleanup_run_autoremove);
         $this->fs = get_file_storage();
 
         $this->initializeSteps();
