@@ -67,9 +67,21 @@ class GhostFilesCleanup implements CleanupStepInterface {
         $output->write('Deleting unlinked files... ');
 
         $ghostfiles = $this->db->get_recordset('local_cleanup_files', [], '', 'id, path');
+        $reclaimed = 0;
 
         foreach ($ghostfiles as $item) {
             $path = $this->dataroot . DIRECTORY_SEPARATOR . $item->path;
+
+            // The scan that recorded this file runs on its own schedule, so this list can be
+            // days old. A file uploaded since then deduplicates onto an existing content hash,
+            // which would make it indistinguishable from a ghost. Re-check before unlinking.
+            if ($this->db->record_exists('files', ['contenthash' => basename($item->path)])) {
+                $this->db->delete_records('local_cleanup_files', ['id' => $item->id]);
+                $reclaimed++;
+                $output->write('R');
+
+                continue;
+            }
 
             if (file_exists($path) && unlink($path)) {
                 $output->write('.');
@@ -78,6 +90,14 @@ class GhostFilesCleanup implements CleanupStepInterface {
             }
 
             $this->db->delete_records('local_cleanup_files', ['id' => $item->id]);
+        }
+
+        $ghostfiles->close();
+
+        if ($reclaimed > 0) {
+            $output->writeLine(
+                sprintf('%d file(s) referenced again since the scan were kept.', $reclaimed)
+            );
         }
 
         $output->writeLine('Done!');
