@@ -153,8 +153,6 @@ class finder {
      *
      * @param array $filter Filter criteria
      * @param bool $count Whether this is for counting (true) or selecting records (false)
-     * @param int $limit Maximum number of records to return
-     * @param int $offset Offset for pagination
      * @return string SQL query
      */
     private function get_search_sql(array $filter, bool $count = false): string {
