@@ -80,10 +80,9 @@ final class files_checkout_test extends advanced_testcase {
             $DB->record_exists('files', ['id' => $second->get_id()]),
             'The record sharing the content must survive too.'
         );
-        $this->assertNotFalse(
-            get_file_storage()->get_file_system()->get_content_file_handle($first),
-            'The pool file must still be readable.'
-        );
+        $handle = get_file_storage()->get_file_system()->get_content_file_handle($first);
+        $this->assertNotFalse($handle, 'The pool file must still be readable.');
+        fclose($handle);
     }
 
     /**
