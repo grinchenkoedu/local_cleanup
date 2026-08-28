@@ -29,7 +29,6 @@ use local_cleanup\output\spy_output;
  * @covers     \local_cleanup\steps\GhostFilesCleanup
  */
 final class ghost_files_cleanup_test extends advanced_testcase {
-
     /**
      * Load the output spy, which lives outside the autoloaded class directory.
      *

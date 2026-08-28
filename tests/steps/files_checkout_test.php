@@ -30,7 +30,6 @@ use stored_file;
  * @covers     \local_cleanup\steps\FilesCheckout
  */
 final class files_checkout_test extends advanced_testcase {
-
     /**
      * Number of days after which a backup is considered outdated, for these tests.
      */

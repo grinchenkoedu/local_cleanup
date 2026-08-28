@@ -113,8 +113,8 @@ while ($items->valid()) {
         $OUTPUT->pix_icon('t/delete', get_string('delete'))
     );
 
-    // html_writer does not escape link text or table cells, so every database value below
-    // is passed through s() explicitly.
+    // Note: html_writer does not escape link text or table cells, so every database value
+    // below is passed through s() explicitly.
     if (!$item->user_deleted) {
         $user = html_writer::link(
             new moodle_url('/user/profile.php', ['id' => $item->userid]),

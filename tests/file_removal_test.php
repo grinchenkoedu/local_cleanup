@@ -34,7 +34,6 @@ use stored_file;
  * @coversNothing
  */
 final class file_removal_test extends advanced_testcase {
-
     /**
      * Deleting one record must leave a record that shares its content alone.
      *

@@ -29,7 +29,6 @@ use stored_file;
  * @covers     \local_cleanup\task\cleanup
  */
 final class cleanup_test extends advanced_testcase {
-
     /**
      * Number of days after which a backup is considered outdated, for these tests.
      */

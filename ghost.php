@@ -71,8 +71,8 @@ while ($items->valid()) {
         ),
     ];
 
-    // html_writer::table() does not escape cell contents; $item->mime in particular comes
-    // from mime_content_type() on a user-supplied file.
+    // Note: html_writer::table() does not escape cell contents; $item->mime in particular
+    // comes from mime_content_type() on a user-supplied file.
     $table->data[] = [
         s($item->path),
         s($item->mime),

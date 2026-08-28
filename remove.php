@@ -73,7 +73,7 @@ if (optional_param('confirm', false, PARAM_BOOL)) {
     require_sesskey();
 
     try {
-        // stored_file::delete() removes this record only. The content itself is kept when
+        // Note: stored_file::delete() removes this record only. The content is kept when
         // another record still references the same contenthash, and moved to the trash
         // directory otherwise, so core's trash clean-up task provides a recovery window.
         $file->delete();
