@@ -42,8 +42,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Removed
 - The redundant `component` index this plugin added to the core `files` table. Core already
   ships `component-filearea-contextid-itemid`, whose leftmost column is `component`, so the
-  same queries are served either way. `component_filesize` and `component_timecreated` remain
-  for now and are documented in `README.md`
+  same queries are served either way. It is dropped on upgrade where it exists, and the 2023
+  upgrade step no longer creates it, so a site upgrading from 1.x does not build an index over
+  the whole `files` table only to drop it again in the same run. `component_filesize` and
+  `component_timecreated` remain for now and are documented in `README.md`
 - Six unused language strings: `batchremovaldone`, `directorylifetime`,
   `directorylifetimedesc`, `removeconfirm`, `title`, `userfiles`
 

@@ -34,11 +34,13 @@ function xmldb_local_cleanup_upgrade($oldversion = 0) {
     $manager = $DB->get_manager();
 
     if ($oldversion < 2023061000) {
+        // This step originally also added a single-column "component" index. It was redundant
+        // with core's own component-filearea-contextid-itemid, which serves the same queries by
+        // leftmost prefix, and the 2026082800 step below removes it. Creating it here would
+        // mean building an index over the whole {files} table only to drop it moments later in
+        // the same upgrade run, which on a large site is slow and pointless, so it is no longer
+        // created. Sites that already ran this step still have it, and still get it dropped.
         $table = new xmldb_table('files');
-        $manager->add_index(
-            $table,
-            new xmldb_index('component', XMLDB_INDEX_NOTUNIQUE, ['component'])
-        );
         $manager->add_index(
             $table,
             new xmldb_index('component_filesize', XMLDB_INDEX_NOTUNIQUE, ['component', 'filesize'])
@@ -65,9 +67,9 @@ function xmldb_local_cleanup_upgrade($oldversion = 0) {
     if ($oldversion < 2026082800) {
         // A plugin must not own indexes on a core table: check_database_schema() defaults to
         // reporting extra indexes, so every site running this plugin sees "Unexpected index".
-        // The single-column "component" index added in 2023 is also redundant, because core's
-        // own component-filearea-contextid-itemid serves the same queries by leftmost prefix,
-        // so dropping it costs nothing.
+        //
+        // This only has work to do on a site that ran the 2023061000 step back when it still
+        // created the index; anywhere else index_exists() is false and the step is skipped.
         //
         // component_filesize and component_timecreated are deliberately left in place until
         // the plugin queries its own indexed table instead. See README.md.
