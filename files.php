@@ -113,21 +113,23 @@ while ($items->valid()) {
         $OUTPUT->pix_icon('t/delete', get_string('delete'))
     );
 
+    // html_writer does not escape link text or table cells, so every database value below
+    // is passed through s() explicitly.
     if (!$item->user_deleted) {
         $user = html_writer::link(
             new moodle_url('/user/profile.php', ['id' => $item->userid]),
-            fullname($item),
+            s(fullname($item)),
             [
                 'target' => '_blank',
             ]
         );
     } else {
-        $user = html_writer::tag('del', fullname($item));
+        $user = html_writer::tag('del', s(fullname($item)));
     }
 
     $table->data[] = [
-        $item->filename,
-        sprintf('%s, %s', $item->component, $item->filearea),
+        s($item->filename),
+        s(sprintf('%s, %s', $item->component, $item->filearea)),
         sprintf(
             '%.1f %s',
             $item->filesize / pow(1024, 2),

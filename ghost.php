@@ -51,7 +51,7 @@ $limit = 250;
 
 $items = $DB->get_recordset('local_cleanup_files', [], 'size DESC', '*', $page * $limit, $limit);
 $totalitems = $DB->count_records('local_cleanup_files');
-$totalsize = $DB->get_field('local_cleanup_files', 'SUM(size)', []);
+$totalsize = $DB->get_field('local_cleanup_files', 'SUM(size)', []) ?: 0;
 
 $table = new html_table();
 $table->head = [
@@ -71,9 +71,11 @@ while ($items->valid()) {
         ),
     ];
 
+    // html_writer::table() does not escape cell contents; $item->mime in particular comes
+    // from mime_content_type() on a user-supplied file.
     $table->data[] = [
-        $item->path,
-        $item->mime,
+        s($item->path),
+        s($item->mime),
         sprintf(
             '%.1f %s',
             $item->size / pow(1024, 2),
