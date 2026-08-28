@@ -87,7 +87,11 @@ if (optional_param('confirm', false, PARAM_BOOL)) {
             ]
         );
         $messagetype = notification::SUCCESS;
-    } catch (Exception $e) {
+    } catch (moodle_exception $e) {
+        // Deliberately narrow: dml_exception and file_exception both extend moodle_exception,
+        // so every failure the File API raises is handled. Anything else - an SDK exception
+        // from an alternative_file_system_class, say - is left to propagate rather than being
+        // reported as an ordinary removal failure.
         debugging($e->getMessage(), DEBUG_DEVELOPER);
 
         $message = get_string(
