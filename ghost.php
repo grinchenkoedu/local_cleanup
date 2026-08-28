@@ -94,8 +94,10 @@ $pagination = $OUTPUT->paging_bar($totalitems, $page, $limit, $PAGE->url);
 echo $OUTPUT->header();
 
 echo $OUTPUT->box(
-    html_writer::tag('p',
-        html_writer::tag('b',
+    html_writer::tag(
+        'p',
+        html_writer::tag(
+            'b',
             get_string(
                 'ghosttotalheader',
                 'local_cleanup',
