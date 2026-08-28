@@ -143,6 +143,8 @@ while ($items->valid()) {
     $items->next();
 }
 
+$items->close();
+
 $pagination = $OUTPUT->paging_bar(
     $totalitems > $maxitems ? $maxitems : $totalitems,
     $page,

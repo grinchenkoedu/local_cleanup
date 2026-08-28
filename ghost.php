@@ -87,6 +87,8 @@ while ($items->valid()) {
     $items->next();
 }
 
+$items->close();
+
 $pagination = $OUTPUT->paging_bar($totalitems, $page, $limit, $PAGE->url);
 
 echo $OUTPUT->header();
