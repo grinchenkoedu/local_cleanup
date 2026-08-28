@@ -34,15 +34,24 @@ if (!is_siteadmin()) {
     exit('Forbidden!');
 }
 
-$filepath = optional_param('path', 0, PARAM_TEXT);
+$filepath = optional_param('path', '', PARAM_PATH);
 $fileid = optional_param('id', 0, PARAM_INT);
 
 if (!empty($filepath)) {
-    $absolute = $CFG->dataroot . DIRECTORY_SEPARATOR . $filepath;
+    // Unlinked files are served straight off disk, so the resolved path must be proven to sit
+    // inside the file pool. PARAM_PATH already strips "..", the realpath check is what
+    // guarantees it: a symlink or any other escape resolves outside $filedirroot and is refused.
+    $filedirroot = realpath($CFG->dataroot . DIRECTORY_SEPARATOR . 'filedir');
+    $absolute = realpath($CFG->dataroot . DIRECTORY_SEPARATOR . $filepath);
 
-    if (!is_readable($absolute)) {
-        header('HTTP/1.1 404 Not found');
-        exit('Not found!');
+    if (
+        $filedirroot === false
+        || $absolute === false
+        || strpos($absolute, $filedirroot . DIRECTORY_SEPARATOR) !== 0
+        || !is_file($absolute)
+        || !is_readable($absolute)
+    ) {
+        throw new moodle_exception('filenotfound', 'error');
     }
 
     send_file($absolute, basename($absolute));
