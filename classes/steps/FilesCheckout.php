@@ -19,6 +19,7 @@ namespace local_cleanup\steps;
 use file_storage;
 use local_cleanup\output\OutputInterface;
 use moodle_database;
+use stored_file;
 
 /**
  * Files checkout cleanup step.
@@ -152,6 +153,7 @@ class FilesCheckout implements CleanupStepInterface {
         if (
             preg_match('/\.mbz$/', $file->get_filename())
             && $file->get_timecreated() <= time() - $this->backuptimeout
+            && $this->is_last_reference($file)
         ) {
             unlink($uri);
             $output->writeLine(sprintf(
@@ -166,7 +168,7 @@ class FilesCheckout implements CleanupStepInterface {
         if (
             $file->get_filearea() === 'draft'
             && $file->get_timecreated() <= time() - $this->drafttimeout
-            && 1 === $this->db->count_records('files', ['contenthash' => $file->get_contenthash()])
+            && $this->is_last_reference($file)
         ) {
             unlink($uri);
             $output->writeLine(
@@ -179,5 +181,19 @@ class FilesCheckout implements CleanupStepInterface {
         }
 
         return true;
+    }
+
+    /**
+     * Check whether this record is the only one referencing its content.
+     *
+     * Moodle deduplicates file content by hash, so the pool file may only be unlinked when no
+     * other record points at it. Without this the removal of one outdated backup destroys the
+     * content of every other record sharing the same bytes.
+     *
+     * @param stored_file $file File to check
+     * @return bool True when no other record shares the content hash
+     */
+    private function is_last_reference(stored_file $file): bool {
+        return 1 === $this->db->count_records('files', ['contenthash' => $file->get_contenthash()]);
     }
 }
