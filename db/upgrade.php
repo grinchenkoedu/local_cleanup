@@ -62,5 +62,24 @@ function xmldb_local_cleanup_upgrade($oldversion = 0) {
         upgrade_plugin_savepoint(true, 2025080700, 'local', 'cleanup');
     }
 
+    if ($oldversion < 2026082800) {
+        // A plugin must not own indexes on a core table: check_database_schema() defaults to
+        // reporting extra indexes, so every site running this plugin sees "Unexpected index".
+        // The single-column "component" index added in 2023 is also redundant, because core's
+        // own component-filearea-contextid-itemid serves the same queries by leftmost prefix,
+        // so dropping it costs nothing.
+        //
+        // component_filesize and component_timecreated are deliberately left in place until
+        // the plugin queries its own indexed table instead. See README.md.
+        $table = new xmldb_table('files');
+        $index = new xmldb_index('component', XMLDB_INDEX_NOTUNIQUE, ['component']);
+
+        if ($manager->index_exists($table, $index)) {
+            $manager->drop_index($table, $index);
+        }
+
+        upgrade_plugin_savepoint(true, 2026082800, 'local', 'cleanup');
+    }
+
     return true;
 }
