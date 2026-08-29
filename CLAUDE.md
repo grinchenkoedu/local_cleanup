@@ -11,7 +11,7 @@ entry-point pages (`files.php`, `ghost.php`, `open.php`, `remove.php`, `download
 | What | Command |
 |---|---|
 | Install | none — no `composer.json`, nothing to install |
-| Test | none — this repository has no test suite (no `tests/`, no PHPUnit config) |
+| Test | `moodle-plugin-ci phpunit` and `behat` — CI only; there is no local Moodle to run them against |
 | Lint | `docker run --rm -v "${PWD}":/app -w /app php:8.1-cli php -l <file>` |
 | Build | none — no compiled assets, no `amd/` directory |
 | Run | `hosted` — needs a Moodle 4.1+ install; the CLI entry points are in `README.md` |
@@ -22,9 +22,15 @@ through the same prefix. The image is pinned to `php:8.1-cli`, the lowest PHP in
 
 The checks that gate a merge are in `.github/workflows/ci.yml`, run through `moodle-plugin-ci`:
 `phplint`, `codechecker --max-warnings 0`, `phpdoc --max-warnings 0`, `validate`, `savepoints`,
-plus a grep that **fails the build on any direct `$_GET` / `$_POST` / `$_REQUEST`**. They need a
-full Moodle install and are not reproducible locally — CI is the source of truth on style, so
-keep changes conservative. Runtime verification here is limited to lint.
+`phpunit`, `behat`, `mustache`, `grunt`, `phpcpd`, `phpmd`, plus a grep that **fails the build
+on any direct `$_GET` / `$_POST` / `$_REQUEST`**. They run on PostgreSQL across three PHP and
+Moodle versions and on MySQL 8 — the second engine exists because a `GROUP BY` defect survived
+two years of single-engine CI. None of it is reproducible locally, so CI is the source of truth
+and runtime verification here is limited to lint.
+
+Two style rules cost the most round trips: an inline comment must start with a capital letter,
+a digit or `...` (a lowercase function name at the start of a comment fails), and a class
+opening brace must not be followed by a blank line.
 
 <!-- toolkit:begin family-rules -->
 
@@ -112,20 +118,30 @@ works in testing.
 
 ## This project specifically
 
-- **Authorisation is `is_siteadmin()`, not capabilities.** There is no `db/access.php`; every
-  entry point does `require_login()` then `if (!is_siteadmin())` with a raw
-  `header('HTTP/1.1 403 Forbidden')`. Follow that pattern rather than inventing a capability
-  halfway.
-- **There is no CSRF helper and no `require_sesskey()` anywhere.** `remove.php` deletes a file
-  and its `files` row on a plain GET with `confirm=1`. New state-changing endpoints should take
-  a sesskey; retrofitting the existing pages means updating their callers too.
-- **`html_writer::table()` does not escape cell contents.** `files.php` and `ghost.php` pass raw
-  database values (`$item->path`, `$item->mime`) into `$table->data`. Wrap new user-influenced
-  cell text in `s()` — the table renderer will not.
+- **Authorisation is by capability**, declared in `db/access.php`. `local/cleanup:view` reads
+  the reports and is granted to `manager`; `local/cleanup:deletefiles` removes a file and is
+  granted to **no archetype**, because it destroys content irreversibly. Every entry point does
+  `require_login()` then `require_capability(..., context_system::instance())`. Gate a new page
+  on `view` and anything destructive on `deletefiles`.
+- **`remove.php` calls `require_sesskey()` before deleting.** Any new state-changing endpoint
+  must do the same. Note the confirmation link has to carry `sesskey` explicitly.
+- **`html_writer::table()` and `html_writer::link()` do not escape.** Every database value that
+  reaches a cell or link text in `files.php` and `ghost.php` is wrapped in `s()`; keep it that
+  way for anything new.
+- **Settings live under `local_cleanup/`** and are read only through `classes/config.php`, which
+  returns typed values. Do not add a `$CFG->cleanup_*` read; add an accessor. A setting that
+  widens what gets deleted needs a safe default — the component list starts empty on purpose,
+  and `config::CLEANABLE_COMPONENTS` is a fixed allowlist so a stray database value cannot
+  widen the blast radius.
 - **This plugin's whole purpose is deletion**, largely from `files` and `local_cleanup_files`
   plus grade and log tables. Treat `classes/steps/*` as data-safety critical: bounded scope,
-  idempotent re-runs, and never widen a `WHERE` without knowing what it now matches.
-  `classes/steps/FilesCheckout.php` scans without removing — the model for a safe dry run.
+  idempotent re-runs, and never widen a `WHERE` without knowing what it now matches. Every step
+  has a test asserting both what it deletes and what it leaves, except
+  `classes/steps/CourseModulesCleanup.php`; match that pattern. Despite its name,
+  `FilesCheckout` deletes — there is no dry-run mode anywhere yet.
+- **Scheduled tasks must do no work in their constructor.** Moodle instantiates them when it
+  re-registers a component, and `ghost.php` builds one purely to read its next run time.
+  `classes/task/cleanup.php` reads configuration in `execute()` for that reason.
 - **`config.php` is gitignored** and belongs to the host Moodle; no credentials live here.
 - **`README.md` carries the operator-facing detail** — cron setup, the recommended core
   maintenance tasks, the stuck-module fix. Link to it rather than restating it.

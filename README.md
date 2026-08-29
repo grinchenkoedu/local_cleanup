@@ -57,6 +57,41 @@ CREATE INDEX mdl_file_comtim_ix ON mdl_files (component, timecreated);
 
 Substitute your own `$CFG->prefix` for `mdl_` if it differs.
 
+## Access
+
+Two capabilities control the plugin, defined in `db/access.php`:
+
+| Capability | Granted to by default | Allows |
+|---|---|---|
+| `local/cleanup:view` | `manager` | Opening both reports |
+| `local/cleanup:deletefiles` | **nobody** | Deleting a file from the files report |
+
+Deletion is granted to no role out of the box on purpose: it removes content irreversibly, so
+it has to be assigned deliberately at Site administration → Users → Permissions → Define roles.
+A site administrator has both regardless.
+
+## What Automatic Clean-up Removes
+
+Automatic removal is off by default. Switching it on enables the grade, log, unlinked-file and
+outdated backup/draft steps.
+
+**It deletes no component files until you choose a component.** The setting is a checkbox list:
+
+| Component | Recommended | Note |
+|---|---|---|
+| Course and activity backups | yes | Regenerable, and usually the largest single consumer |
+| Assignment file submissions | no | Student work |
+| Assignment feedback files | no | Marker feedback |
+| Recycle bin contents | no | Leaves recycle bin entries pointing at nothing |
+
+Only backups are recommended, because they are the one entry that can be recreated. For the
+others, the file is removed but the owning activity's own records stay behind, until the file
+API migration in a later release.
+
+Sites upgrading from 2.3 or earlier that already had automatic removal enabled keep the
+previous behaviour: the upgrade ticks backups and assignment submissions, matching the pair
+that used to be hardcoded. Sites with it disabled start with nothing ticked.
+
 ## Cron Tasks
 
 The automatic clean-up functionality relies on properly configured Moodle cron tasks. Ensure your crontab includes:
