@@ -19,6 +19,7 @@ namespace local_cleanup\step;
 use advanced_testcase;
 use context_system;
 use local_cleanup\output\spy_output;
+use local_cleanup\step_result;
 
 /**
  * Tests for the unlinked ("ghost") files clean-up step.
@@ -158,6 +159,31 @@ final class ghost_files_cleanup_test extends advanced_testcase {
     }
 
     /**
+     * A dry run counts the unreferenced files and deletes neither row nor file.
+     *
+     * @return void
+     */
+    public function test_report_counts_without_deleting(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $content = 'orphaned content ' . random_string(32);
+        $hash = sha1($content);
+        $path = $this->write_pool_file($hash, $content);
+        $recordid = $this->record_as_ghost($hash);
+
+        $result = $this->run_report();
+
+        $this->assertSame(1, $result->get_records());
+        $this->assertFileExists($path, 'A dry run must not touch the file.');
+        $this->assertTrue(
+            $DB->record_exists('local_cleanup_files', ['id' => $recordid]),
+            'A dry run must not clear the scan record either.'
+        );
+    }
+
+    /**
      * Run the step under test.
      *
      * @return spy_output The captured output
@@ -170,6 +196,17 @@ final class ghost_files_cleanup_test extends advanced_testcase {
         $step->execute($output);
 
         return $output;
+    }
+
+    /**
+     * Report on the step under test.
+     *
+     * @return step_result What would be removed
+     */
+    private function run_report(): step_result {
+        global $CFG, $DB;
+
+        return (new ghost_files_cleanup($DB, $CFG->dataroot))->report(new spy_output());
     }
 
     /**

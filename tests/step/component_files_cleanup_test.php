@@ -19,6 +19,7 @@ namespace local_cleanup\step;
 use advanced_testcase;
 use context_system;
 use local_cleanup\output\spy_output;
+use local_cleanup\step_result;
 use stored_file;
 
 /**
@@ -120,6 +121,26 @@ final class component_files_cleanup_test extends advanced_testcase {
     }
 
     /**
+     * A dry run counts the same files and removes none of them.
+     *
+     * @return void
+     */
+    public function test_report_counts_without_deleting(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $file = $this->create_file('old.txt', 'assignsubmission_file', $this->outdated());
+        $before = $DB->count_records('files');
+
+        $result = $this->run_report(['assignsubmission_file']);
+
+        $this->assertSame(1, $result->get_records());
+        $this->assertTrue($DB->record_exists('files', ['id' => $file->get_id()]));
+        $this->assertSame($before, $DB->count_records('files'), 'A dry run must write nothing.');
+    }
+
+    /**
      * Run the step under test.
      *
      * @param array $components Components to clean up
@@ -133,6 +154,20 @@ final class component_files_cleanup_test extends advanced_testcase {
         $step->execute($output);
 
         return $output;
+    }
+
+    /**
+     * Report on the step under test.
+     *
+     * @param array $components Components to clean up
+     * @return step_result What would be removed
+     */
+    private function run_report(array $components): step_result {
+        global $DB;
+
+        $step = new component_files_cleanup($DB, $components, self::KEEP_DAYS);
+
+        return $step->report(new spy_output());
     }
 
     /**

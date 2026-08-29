@@ -19,6 +19,7 @@ namespace local_cleanup\step;
 use advanced_testcase;
 use context_system;
 use local_cleanup\output\spy_output;
+use local_cleanup\step_result;
 
 /**
  * Tests for the logs clean-up step.
@@ -122,6 +123,30 @@ final class logs_cleanup_test extends advanced_testcase {
     }
 
     /**
+     * A dry run counts the same entries and removes none of them.
+     *
+     * @return void
+     */
+    public function test_report_counts_without_deleting(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $old = $this->create_log(time() - (self::KEEP_DAYS + 1) * DAYSECS);
+        $before = $DB->count_records('logstore_standard_log');
+
+        $result = $this->run_report();
+
+        $this->assertGreaterThanOrEqual(1, $result->get_records());
+        $this->assertTrue($DB->record_exists('logstore_standard_log', ['id' => $old]));
+        $this->assertSame(
+            $before,
+            $DB->count_records('logstore_standard_log'),
+            'A dry run must write nothing.'
+        );
+    }
+
+    /**
      * Run the step under test.
      *
      * @return spy_output The captured output
@@ -134,6 +159,17 @@ final class logs_cleanup_test extends advanced_testcase {
         $step->execute($output);
 
         return $output;
+    }
+
+    /**
+     * Report on the step under test.
+     *
+     * @return step_result What would be removed
+     */
+    private function run_report(): step_result {
+        global $DB;
+
+        return (new logs_cleanup($DB, self::KEEP_DAYS))->report(new spy_output());
     }
 
     /**

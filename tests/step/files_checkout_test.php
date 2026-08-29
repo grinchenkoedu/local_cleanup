@@ -19,6 +19,7 @@ namespace local_cleanup\step;
 use advanced_testcase;
 use context_system;
 use local_cleanup\output\spy_output;
+use local_cleanup\step_result;
 use stored_file;
 
 /**
@@ -145,6 +146,27 @@ final class files_checkout_test extends advanced_testcase {
     }
 
     /**
+     * A dry run counts the outdated backup and removes nothing.
+     *
+     * @return void
+     */
+    public function test_report_counts_without_deleting(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $file = $this->create_backup('lonely.mbz', 'unique ' . random_string(32), $this->outdated());
+        $before = $DB->count_records('files');
+
+        $result = $this->run_report();
+
+        $this->assertSame(1, $result->get_records());
+        $this->assertSame((int)$file->get_filesize(), $result->get_bytes());
+        $this->assertTrue($DB->record_exists('files', ['id' => $file->get_id()]));
+        $this->assertSame($before, $DB->count_records('files'), 'A dry run must write nothing.');
+    }
+
+    /**
      * Run the step under test.
      *
      * @return spy_output The captured output
@@ -157,6 +179,19 @@ final class files_checkout_test extends advanced_testcase {
         $step->execute($output);
 
         return $output;
+    }
+
+    /**
+     * Report on the step under test.
+     *
+     * @return step_result What would be removed
+     */
+    private function run_report(): step_result {
+        global $DB;
+
+        $step = new files_checkout($DB, get_file_storage(), self::TIMEOUT_DAYS, self::TIMEOUT_DAYS);
+
+        return $step->report(new spy_output());
     }
 
     /**
