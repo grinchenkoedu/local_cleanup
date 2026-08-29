@@ -26,32 +26,37 @@
 
 defined('MOODLE_INTERNAL') || die;
 
+// The reports are registered for everyone: each page declares local/cleanup:view, and the
+// admin tree hides a page whose capability the viewer lacks, along with a category left with
+// no visible children. Gating these on $hassiteconfig would leave the capability grantable but
+// unreachable, since a manager would have no link to follow.
+$ADMIN->add(
+    'root',
+    new admin_category('local_cleanup', get_string('pluginname', 'local_cleanup'))
+);
+
+$ADMIN->add(
+    'local_cleanup',
+    new admin_externalpage(
+        'local_cleanup_userfiles',
+        get_string('files'),
+        new moodle_url('/local/cleanup/files.php'),
+        'local/cleanup:view'
+    )
+);
+
+$ADMIN->add(
+    'local_cleanup',
+    new admin_externalpage(
+        'local_cleanup_ghostfiles',
+        get_string('ghostfiles', 'local_cleanup'),
+        new moodle_url('/local/cleanup/ghost.php'),
+        'local/cleanup:view'
+    )
+);
+
+// Changing what gets deleted stays with whoever administers the site.
 if ($hassiteconfig) {
-    $ADMIN->add(
-        'root',
-        new admin_category('local_cleanup', get_string('pluginname', 'local_cleanup'))
-    );
-
-    $ADMIN->add(
-        'local_cleanup',
-        new admin_externalpage(
-            'local_cleanup_userfiles',
-            get_string('files'),
-            new moodle_url('/local/cleanup/files.php'),
-            'local/cleanup:view'
-        )
-    );
-
-    $ADMIN->add(
-        'local_cleanup',
-        new admin_externalpage(
-            'local_cleanup_ghostfiles',
-            get_string('ghostfiles', 'local_cleanup'),
-            new moodle_url('/local/cleanup/ghost.php'),
-            'local/cleanup:view'
-        )
-    );
-
     $settings = new admin_settingpage(
         'local_cleanup_admin',
         get_string('settingspage', 'local_cleanup')
