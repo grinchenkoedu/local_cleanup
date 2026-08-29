@@ -154,7 +154,7 @@ final class files_checkout_test extends advanced_testcase {
 
         $output = new spy_output();
         $step = new files_checkout($DB, get_file_storage(), self::TIMEOUT_DAYS, self::TIMEOUT_DAYS);
-        $step->cleanup($output);
+        $step->execute($output);
 
         return $output;
     }

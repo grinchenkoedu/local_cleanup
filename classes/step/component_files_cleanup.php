@@ -63,41 +63,38 @@ class component_files_cleanup extends base {
     }
 
     /**
-     * Execute the cleanup step.
+     * Name this step.
      *
-     * Removes files from specified components that are older than the configured days to keep.
-     *
-     * @param output_interface $output Output handler for logging
-     * @return void
+     * @return string Short human-readable name
      */
-    public function cleanup(output_interface $output) {
-        $output->write_line('Starting component files cleanup...');
+    public function get_name(): string {
+        return 'Component files';
+    }
 
-        $cutoffdate = time() - ($this->daystokeep * 24 * 60 * 60);
+    /**
+     * One candidate set per component the administrator opted in to.
+     *
+     * @return array[] Candidate sets
+     */
+    protected function get_candidates(): array {
+        $cutoffdate = time() - ($this->daystokeep * DAYSECS);
+        $candidates = [];
 
         foreach ($this->components as $component) {
-            $output->write_line("Processing component '$component'...");
-
-            $params = [
-                'component' => $component,
-                'cutoffdate' => $cutoffdate,
+            $candidates[] = [
+                'table' => 'files',
+                'sql' => "SELECT f.id
+                            FROM {files} f
+                           WHERE f.component = :component_{$component}
+                             AND f.timecreated < :cutoffdate_{$component}",
+                'params' => [
+                    "component_{$component}" => $component,
+                    "cutoffdate_{$component}" => $cutoffdate,
+                ],
+                'message' => sprintf('%s files older than %d days', $component, $this->daystokeep),
             ];
-
-            $sql = "SELECT f.id
-                    FROM {files} f
-                    WHERE f.component = :component
-                    AND f.timecreated < :cutoffdate";
-
-            $this->process_records_in_batches(
-                'files',
-                'f',
-                $sql,
-                $params,
-                "Checking for files to clean up in component '$component'...",
-                $output
-            );
         }
 
-        $output->write_line('Component files cleanup completed.');
+        return $candidates;
     }
 }

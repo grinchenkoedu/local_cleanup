@@ -17,6 +17,7 @@
 namespace local_cleanup\step;
 
 use local_cleanup\output\output_interface;
+use local_cleanup\step_result;
 use moodle_database;
 
 /**
@@ -55,32 +56,69 @@ class ghost_files_cleanup implements step_interface {
     }
 
     /**
-     * Execute the cleanup step.
+     * Name this step.
      *
-     * Removes ghost files that are tracked in the cleanup table.
-     *
-     * @param output_interface $output Output handler for logging
-     * @return void
+     * @return string Short human-readable name
      */
-    public function cleanup(output_interface $output) {
-        $output->write('Deleting unlinked files... ');
+    public function get_name(): string {
+        return 'Unlinked files';
+    }
 
-        $ghostfiles = $this->db->get_recordset('local_cleanup_files', [], '', 'id, path');
+    /**
+     * Count the recorded files that are still unreferenced, deleting none of them.
+     *
+     * @param output_interface $output Output handler for progress
+     * @return step_result What would be removed
+     */
+    public function report(output_interface $output): step_result {
+        return $this->walk($output, false);
+    }
+
+    /**
+     * Remove the recorded files that are still unreferenced.
+     *
+     * @param output_interface $output Output handler for progress
+     * @return step_result What was removed
+     */
+    public function execute(output_interface $output): step_result {
+        return $this->walk($output, true);
+    }
+
+    /**
+     * Walk the scan results, re-checking each and optionally acting.
+     *
+     * @param output_interface $output Output handler for progress
+     * @param bool $delete Whether to actually remove what is found
+     * @return step_result What was, or would be, removed
+     */
+    private function walk(output_interface $output, bool $delete): step_result {
+        $result = new step_result();
+        $output->write($delete ? 'Deleting unlinked files... ' : 'Checking unlinked files... ');
+
+        $ghostfiles = $this->db->get_recordset('local_cleanup_files', [], '', 'id, path, size');
         $reclaimed = 0;
 
         foreach ($ghostfiles as $item) {
-            $path = $this->dataroot . DIRECTORY_SEPARATOR . $item->path;
-
             // The scan that recorded this file runs on its own schedule, so this list can be
             // days old. A file uploaded since then deduplicates onto an existing content hash,
-            // which would make it indistinguishable from a ghost. Re-check before unlinking.
+            // which would make it indistinguishable from a ghost. Re-check before acting.
             if ($this->db->record_exists('files', ['contenthash' => basename($item->path)])) {
-                $this->db->delete_records('local_cleanup_files', ['id' => $item->id]);
                 $reclaimed++;
-                $output->write('R');
+
+                if ($delete) {
+                    $this->db->delete_records('local_cleanup_files', ['id' => $item->id]);
+                }
 
                 continue;
             }
+
+            $result->add(1, (int)$item->size);
+
+            if (!$delete) {
+                continue;
+            }
+
+            $path = $this->dataroot . DIRECTORY_SEPARATOR . $item->path;
 
             if (file_exists($path) && unlink($path)) {
                 $output->write('.');
@@ -94,11 +132,12 @@ class ghost_files_cleanup implements step_interface {
         $ghostfiles->close();
 
         if ($reclaimed > 0) {
-            $output->write_line(
-                sprintf('%d file(s) referenced again since the scan were kept.', $reclaimed)
-            );
+            $result->note(sprintf('%d file(s) referenced again since the scan were kept.', $reclaimed));
+            $output->write_line(sprintf('%d file(s) referenced again since the scan were kept.', $reclaimed));
         }
 
-        $output->write_line('Done!');
+        $output->write_line($result->summarise());
+
+        return $result;
     }
 }

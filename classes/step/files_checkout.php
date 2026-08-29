@@ -18,6 +18,7 @@ namespace local_cleanup\step;
 
 use file_storage;
 use local_cleanup\output\output_interface;
+use local_cleanup\step_result;
 use moodle_database;
 use stored_file;
 
@@ -90,98 +91,143 @@ class files_checkout implements step_interface {
     }
 
     /**
-     * Execute the cleanup step.
+     * Name this step.
      *
-     * Checks all files and removes outdated backups and draft files.
-     *
-     * @param output_interface $output Output handler for logging
-     * @return void
+     * @return string Short human-readable name
      */
-    public function cleanup(output_interface $output) {
-        $output->write('Fetching records... ');
-
-        $ids = $this->db->get_fieldset_select('files', 'id', self::SELECT_ALL);
-        $count = count($ids);
-        $progress = 0;
-
-        $output->write_line(sprintf('%d records found.', count($ids)));
-        $output->write('Processing... ');
-
-        foreach ($ids as $index => $id) {
-            $done = ceil(($index * 100) / $count);
-
-            if ($done > $progress) {
-                $output->write(sprintf('%d%%... ', $done));
-                $progress = $done;
-            }
-
-            if ($this->checkout($id, $output)) {
-                continue;
-            }
-
-            $this->db->delete_records('files', ['id' => $id]);
-        }
+    public function get_name(): string {
+        return 'Outdated backups and drafts';
     }
 
     /**
-     * Check a file and remove it if it's outdated.
+     * Count what would go, opening nothing for writing.
      *
-     * @param int $id File ID to check
-     * @param output_interface $output Output handler for logging
-     * @return bool True if the file should be kept, false if it was removed
+     * @param output_interface $output Output handler for progress
+     * @return step_result What would be removed
      */
-    private function checkout($id, output_interface $output): bool {
-        $file = $this->fs->get_file_by_id($id);
+    public function report(output_interface $output): step_result {
+        return $this->walk($output, false);
+    }
 
-        if ($file === false) {
-            // Wrong id provided (maybe already removed), continue...
-            return true;
+    /**
+     * Remove the outdated backups and drafts.
+     *
+     * @param output_interface $output Output handler for progress
+     * @return step_result What was removed
+     */
+    public function execute(output_interface $output): step_result {
+        return $this->walk($output, true);
+    }
+
+    /**
+     * Walk every file record, deciding on each and optionally acting.
+     *
+     * A recordset rather than get_fieldset_select(): this used to load the id of every file on
+     * the site into memory at once, which on the sites this plugin exists for is millions of
+     * integers.
+     *
+     * @param output_interface $output Output handler for progress
+     * @param bool $delete Whether to actually remove what is found
+     * @return step_result What was, or would be, removed
+     */
+    private function walk(output_interface $output, bool $delete): step_result {
+        $result = new step_result();
+        $output->write($delete ? 'Removing outdated files... ' : 'Checking for outdated files... ');
+
+        $records = $this->db->get_recordset('files', [], '', 'id');
+
+        foreach ($records as $record) {
+            $file = $this->fs->get_file_by_id($record->id);
+
+            if ($file === false) {
+                // Already gone; nothing to decide.
+                continue;
+            }
+
+            $reason = $this->removal_reason($file);
+
+            if ($reason === null) {
+                continue;
+            }
+
+            $result->add(1, (int)$file->get_filesize());
+
+            if (!$delete) {
+                continue;
+            }
+
+            $this->remove($file, $output);
+            $output->write_line(sprintf(
+                '%s "%s" (%s). Removed.',
+                $reason,
+                $file->get_filename(),
+                $file->get_contenthash()
+            ));
         }
 
-        $resource = $this->fs->get_file_system()->get_content_file_handle($file);
+        $records->close();
+        $output->write_line($result->summarise());
 
-        if ($resource === false) {
-            $output->write_line(sprintf('File "%s" is not found or not readable. Removed.', $id));
+        return $result;
+    }
 
-            return false;
+    /**
+     * Decide whether a file is outdated, without touching it.
+     *
+     * @param stored_file $file File to judge
+     * @return string|null Why it should go, or null to keep it
+     */
+    private function removal_reason(stored_file $file): ?string {
+        $handle = $this->fs->get_file_system()->get_content_file_handle($file);
+
+        if ($handle === false) {
+            return 'Content missing for';
         }
 
-        $uri = stream_get_meta_data($resource)['uri'];
-        fclose($resource);
+        fclose($handle);
+
+        if (!$this->is_last_reference($file)) {
+            // Other records share these bytes, so removing them would break those records.
+            return null;
+        }
 
         if (
             preg_match('/\.mbz$/', $file->get_filename())
             && $file->get_timecreated() <= time() - $this->backuptimeout
-            && $this->is_last_reference($file)
         ) {
-            unlink($uri);
-            $output->write_line(sprintf(
-                'Backup "%s" (%s) is outdated. Removed.',
-                $file->get_filename(),
-                $file->get_contenthash()
-            ));
-
-            return false;
+            return 'Outdated backup';
         }
 
         if (
             $file->get_filearea() === 'draft'
             && $file->get_timecreated() <= time() - $this->drafttimeout
-            && $this->is_last_reference($file)
         ) {
-            unlink($uri);
-            $output->write_line(
-                sprintf(
-                    'Outdated draft "%s" (%s). Removed.',
-                    $file->get_filename(),
-                    $file->get_contenthash()
-                )
-            );
-
-            return false;
+            return 'Outdated draft';
         }
 
-        return true;
+        return null;
+    }
+
+    /**
+     * Remove the pool file, where there is one, and then the record.
+     *
+     * @param stored_file $file File to remove
+     * @param output_interface $output Output handler for progress
+     * @return void
+     */
+    private function remove(stored_file $file, output_interface $output): void {
+        $handle = $this->fs->get_file_system()->get_content_file_handle($file);
+
+        if ($handle !== false) {
+            $uri = stream_get_meta_data($handle)['uri'];
+            fclose($handle);
+
+            if (!unlink($uri)) {
+                $output->write_line(sprintf('Could not unlink "%s".', $uri));
+            }
+        }
+
+        $this->db->delete_records('files', ['id' => $file->get_id()]);
     }
 
     /**

@@ -130,7 +130,7 @@ final class component_files_cleanup_test extends advanced_testcase {
 
         $output = new spy_output();
         $step = new component_files_cleanup($DB, $components, self::KEEP_DAYS);
-        $step->cleanup($output);
+        $step->execute($output);
 
         return $output;
     }

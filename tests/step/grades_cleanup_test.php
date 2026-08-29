@@ -177,7 +177,7 @@ final class grades_cleanup_test extends advanced_testcase {
 
         $output = new spy_output();
         $step = new grades_cleanup($DB, self::KEEP_DAYS);
-        $step->cleanup($output);
+        $step->execute($output);
 
         return $output;
     }

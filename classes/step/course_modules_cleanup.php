@@ -18,6 +18,7 @@ namespace local_cleanup\step;
 
 use Throwable;
 use local_cleanup\output\output_interface;
+use local_cleanup\step_result;
 use moodle_database;
 
 /**
@@ -59,28 +60,61 @@ class course_modules_cleanup implements step_interface {
     }
 
     /**
-     * Execute the cleanup step.
+     * Name this step.
      *
-     * Cleans up orphaned course modules and failed course module deletion tasks.
-     *
-     * @param output_interface $output Output handler for logging
-     * @return void
+     * @return string Short human-readable name
      */
-    public function cleanup(output_interface $output) {
+    public function get_name(): string {
+        return 'Stuck course modules';
+    }
+
+    /**
+     * Count the modules this step would force through deletion.
+     *
+     * @param output_interface $output Output handler for progress
+     * @return step_result What would be removed
+     */
+    public function report(output_interface $output): step_result {
+        $result = new step_result();
+
+        $orphaned = $this->db->count_records_sql(
+            'SELECT COUNT(1) FROM {course_modules} cm
+               LEFT JOIN {course} c ON cm.course = c.id
+                   WHERE c.id IS NULL'
+        );
+        $result->add((int)$orphaned);
+        $output->write_line(sprintf('%d course module(s) belong to a course that is gone.', $orphaned));
+
+        $stuck = 0;
+
+        foreach ($this->get_failed_removal_tasks() as $task) {
+            $customdata = json_decode($task->customdata);
+            $stuck += isset($customdata->cms) ? count($customdata->cms) : 0;
+        }
+
+        $result->add($stuck);
+        $output->write_line(sprintf('%d course module(s) sit behind a failed removal task.', $stuck));
+
+        return $result;
+    }
+
+    /**
+     * Force the stuck deletions through.
+     *
+     * @param output_interface $output Output handler for progress
+     * @return step_result What was removed
+     */
+    public function execute(output_interface $output): step_result {
         global $CFG;
 
-        $this->clean_up_orphaned_course_modules($output);
+        $result = new step_result();
 
-        $cutofftime = time() - ($this->daystokeep * 24 * 60 * 60);
+        $this->clean_up_orphaned_course_modules($output, $result);
 
-        $tasks = $this->db->get_records_select(
-            'task_adhoc',
-            'classname = ? AND faildelay > 0 AND timestarted < ?',
-            ['\core_course\task\course_delete_modules', $cutofftime]
-        );
+        $tasks = $this->get_failed_removal_tasks();
 
         if (count($tasks) === 0) {
-            return;
+            return $result;
         }
 
         require_once($CFG->dirroot . '/course/lib.php');
@@ -92,6 +126,7 @@ class course_modules_cleanup implements step_interface {
             foreach ($customdata->cms as $cm) {
                 try {
                     $this->delete_course_module($cm->id, $output);
+                    $result->add(1);
                 } catch (Throwable $e) {
                     $output->write_line(sprintf('Failed to delete course module %d: %s', $cm->id, $e->getMessage()));
                     $success = false;
@@ -102,6 +137,21 @@ class course_modules_cleanup implements step_interface {
                 $this->db->delete_records('task_adhoc', ['id' => $task->id]);
             }
         }
+
+        return $result;
+    }
+
+    /**
+     * Removal tasks that have been failing longer than the configured grace period.
+     *
+     * @return array Adhoc task records
+     */
+    private function get_failed_removal_tasks(): array {
+        return $this->db->get_records_select(
+            'task_adhoc',
+            'classname = ? AND faildelay > 0 AND timestarted < ?',
+            ['\core_course\task\course_delete_modules', time() - ($this->daystokeep * DAYSECS)]
+        );
     }
 
     /**
@@ -153,9 +203,10 @@ class course_modules_cleanup implements step_interface {
      * Identifies and removes course modules that reference courses that no longer exist.
      *
      * @param output_interface $output Output handler for logging
+     * @param step_result $result Tally to add to
      * @return void
      */
-    private function clean_up_orphaned_course_modules(output_interface $output): void {
+    private function clean_up_orphaned_course_modules(output_interface $output, step_result $result): void {
         global $CFG;
 
         $output->write_line('Checking for course modules tied to deleted courses...');
@@ -179,6 +230,7 @@ class course_modules_cleanup implements step_interface {
         foreach ($orphanedmodules as $cm) {
             try {
                 $this->delete_course_module($cm->id, $output);
+                $result->add(1);
             } catch (Throwable $e) {
                 $output->write_line(sprintf('Failed to delete orphaned course module %d: %s', $cm->id, $e->getMessage()));
             }

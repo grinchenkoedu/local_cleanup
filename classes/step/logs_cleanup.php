@@ -62,76 +62,49 @@ class logs_cleanup extends base {
     }
 
     /**
-     * Execute the cleanup step.
+     * Name this step.
      *
-     * Cleans up both standard and analytics logs.
-     *
-     * @param output_interface $output Output handler for logging
-     * @return void
+     * @return string Short human-readable name
      */
-    public function cleanup(output_interface $output) {
-        $output->write_line('Starting logs cleanup...');
-
-        $this->cleanup_standard_logs($output);
-        $this->cleanup_lanalytics_logs($output);
-
-        $output->write_line('Logs cleanup completed.');
+    public function get_name(): string {
+        return 'Logs';
     }
 
     /**
-     * Clean up standard logs that are obsolete or older than the configured days to keep.
+     * Obsolete or outdated entries, in whichever log tables this site has.
      *
-     * @param output_interface $output Output handler for logging
-     * @return void
+     * @return array[] Candidate sets
      */
-    private function cleanup_standard_logs(output_interface $output) {
-        $sql = "SELECT l.id
-                FROM {logstore_standard_log} l
-                LEFT JOIN {context} ctx ON ctx.id = l.contextid
-                WHERE ctx.id IS NULL
-                      OR l.timecreated < :cutoffdate";
+    protected function get_candidates(): array {
+        $candidates = [
+            $this->log_candidate('logstore_standard_log'),
+        ];
 
-        $this->process_records_in_batches(
-            'logstore_standard_log',
-            'l',
-            $sql,
-            ['cutoffdate' => $this->cutoffdate],
-            sprintf(
-                'Checking for logs to clean up (obsolete or older than %d days)...',
-                $this->cutoffdays
-            ),
-            $output
-        );
-    }
-
-    /**
-     * Clean up learning analytics logs that are obsolete or older than the configured days to keep.
-     *
-     * @param output_interface $output Output handler for logging
-     * @return void
-     */
-    private function cleanup_lanalytics_logs(output_interface $output) {
-        if (!$this->db->get_manager()->table_exists('logstore_lanalytics_log')) {
-            $output->write_line('Skipping cleanup of logstore_lanalytics_log: table does not exist.');
-            return;
+        if ($this->db->get_manager()->table_exists('logstore_lanalytics_log')) {
+            $candidates[] = $this->log_candidate('logstore_lanalytics_log');
         }
 
-        $sql = "SELECT l.id
-                FROM {logstore_lanalytics_log} l
-                LEFT JOIN {context} ctx ON ctx.id = l.contextid
-                WHERE ctx.id IS NULL
-                      OR l.timecreated < :cutoffdate";
+        return $candidates;
+    }
 
-        $this->process_records_in_batches(
-            'logstore_lanalytics_log',
-            'l',
-            $sql,
-            ['cutoffdate' => $this->cutoffdate],
-            sprintf(
-                'Checking for logs to clean up (obsolete or older than %d days)...',
-                $this->cutoffdays
-            ),
-            $output
-        );
+    /**
+     * Build the candidate set for one log table.
+     *
+     * Both tables have the same shape, so the same query serves either.
+     *
+     * @param string $table Log table name
+     * @return array Candidate set
+     */
+    private function log_candidate(string $table): array {
+        return [
+            'table' => $table,
+            'sql' => "SELECT l.id
+                        FROM {" . $table . "} l
+                   LEFT JOIN {context} ctx ON ctx.id = l.contextid
+                       WHERE ctx.id IS NULL
+                          OR l.timecreated < :cutoffdate",
+            'params' => ['cutoffdate' => $this->cutoffdate],
+            'message' => sprintf('obsolete, or older than %d days', $this->cutoffdays),
+        ];
     }
 }

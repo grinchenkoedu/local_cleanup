@@ -164,7 +164,7 @@ final class ghost_files_cleanup_test extends advanced_testcase {
 
         $output = new spy_output();
         $step = new ghost_files_cleanup($DB, $CFG->dataroot);
-        $step->cleanup($output);
+        $step->execute($output);
 
         return $output;
     }

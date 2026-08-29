@@ -111,9 +111,13 @@ final class logs_cleanup_test extends advanced_testcase {
 
         $output = $this->run_cleanup();
 
+        $this->assertFalse(
+            $output->contains('logstore_lanalytics_log'),
+            'A table this site does not have should not appear in the run at all.'
+        );
         $this->assertTrue(
-            $output->contains('Skipping cleanup of logstore_lanalytics_log'),
-            'The step should say it skipped the optional table.'
+            $output->contains('logstore_standard_log'),
+            'The table it does have should still be cleaned.'
         );
     }
 
@@ -127,7 +131,7 @@ final class logs_cleanup_test extends advanced_testcase {
 
         $output = new spy_output();
         $step = new logs_cleanup($DB, self::KEEP_DAYS);
-        $step->cleanup($output);
+        $step->execute($output);
 
         return $output;
     }
