@@ -37,7 +37,8 @@ if ($hassiteconfig) {
         new admin_externalpage(
             'local_cleanup_userfiles',
             get_string('files'),
-            new moodle_url('/local/cleanup/files.php')
+            new moodle_url('/local/cleanup/files.php'),
+            'local/cleanup:view'
         )
     );
 
@@ -46,7 +47,8 @@ if ($hassiteconfig) {
         new admin_externalpage(
             'local_cleanup_ghostfiles',
             get_string('ghostfiles', 'local_cleanup'),
-            new moodle_url('/local/cleanup/ghost.php')
+            new moodle_url('/local/cleanup/ghost.php'),
+            'local/cleanup:view'
         )
     );
 

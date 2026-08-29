@@ -39,11 +39,7 @@ $PAGE->set_heading(get_string('ghostfiles', 'local_cleanup'));
 $PAGE->set_pagelayout('admin');
 
 require_login();
-
-if (!is_siteadmin()) {
-    header('HTTP/1.1 403 Forbidden');
-    exit('Forbidden!');
-}
+require_capability('local/cleanup:view', context_system::instance());
 
 $task = task_manager::get_scheduled_task(cleanup::class);
 $page = optional_param('page', 0, PARAM_INT);

@@ -39,11 +39,7 @@ $PAGE->set_heading(get_string('remove'));
 $PAGE->set_pagelayout('default');
 
 require_login();
-
-if (!is_siteadmin()) {
-    header('HTTP/1.1 403 Forbidden');
-    exit('Forbidden!');
-}
+require_capability('local/cleanup:deletefiles', context_system::instance());
 
 $id = required_param('id', PARAM_INT);
 

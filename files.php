@@ -40,11 +40,7 @@ $PAGE->set_heading(get_string('files'));
 $PAGE->set_pagelayout('admin');
 
 require_login();
-
-if (!is_siteadmin()) {
-    header('HTTP/1.1 403 Forbidden');
-    exit('Forbidden!');
-}
+require_capability('local/cleanup:view', context_system::instance());
 
 $page = optional_param('page', 0, PARAM_INT);
 $limit = $CFG->cleanup_items_per_page ?? finder::LIMIT_DEFAULT;
@@ -64,6 +60,8 @@ if ($filterform->is_cancelled()) {
 }
 
 $redirecturl = new moodle_url($PAGE->url, array_merge($filter, ['page' => $page]));
+
+$candelete = has_capability('local/cleanup:deletefiles', context_system::instance());
 
 $finder = new finder($DB);
 $items = $finder->find($limit, $page * $limit, $filter);
@@ -108,10 +106,12 @@ while ($items->valid()) {
         );
     }
 
-    $actions[] = html_writer::link(
-        new moodle_url('/local/cleanup/remove.php', ['id' => $item->id, 'redirect' => $redirecturl]),
-        $OUTPUT->pix_icon('t/delete', get_string('delete'))
-    );
+    if ($candelete) {
+        $actions[] = html_writer::link(
+            new moodle_url('/local/cleanup/remove.php', ['id' => $item->id, 'redirect' => $redirecturl]),
+            $OUTPUT->pix_icon('t/delete', get_string('delete'))
+        );
+    }
 
     // Note: html_writer does not escape link text or table cells, so every database value
     // below is passed through s() explicitly.

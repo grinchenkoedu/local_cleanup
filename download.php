@@ -28,11 +28,7 @@ require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir . '/filelib.php');
 
 require_login();
-
-if (!is_siteadmin()) {
-    header('HTTP/1.1 403 Forbidden');
-    exit('Forbidden!');
-}
+require_capability('local/cleanup:view', context_system::instance());
 
 $filepath = optional_param('path', '', PARAM_PATH);
 $fileid = optional_param('id', 0, PARAM_INT);
