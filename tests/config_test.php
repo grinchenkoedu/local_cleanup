@@ -87,6 +87,53 @@ final class config_test extends advanced_testcase {
     }
 
     /**
+     * Every lifetime accessor reads its own setting.
+     *
+     * They share one code path, so this guards against a copy-paste error pointing two
+     * accessors at the same key.
+     *
+     * @return void
+     */
+    public function test_each_lifetime_reads_its_own_setting(): void {
+        $this->resetAfterTest();
+
+        $settings = [
+            'backuplifetimedays' => 11,
+            'draftlifetimedays' => 22,
+            'logslifetimedays' => 33,
+            'componentfileslifetimedays' => 44,
+            'gradeslifetimedays' => 55,
+            'coursemoduleslifetimedays' => 66,
+        ];
+
+        foreach ($settings as $name => $value) {
+            set_config($name, $value, 'local_cleanup');
+        }
+
+        $this->assertSame(11, config::backup_lifetime_days());
+        $this->assertSame(22, config::draft_lifetime_days());
+        $this->assertSame(33, config::logs_lifetime_days());
+        $this->assertSame(44, config::component_files_lifetime_days());
+        $this->assertSame(55, config::grades_lifetime_days());
+        $this->assertSame(66, config::course_modules_lifetime_days());
+    }
+
+    /**
+     * The page size falls back when unset.
+     *
+     * @return void
+     */
+    public function test_items_per_page(): void {
+        $this->resetAfterTest();
+
+        $this->assertSame(finder::LIMIT_DEFAULT, config::items_per_page());
+
+        set_config('itemsperpage', 200, 'local_cleanup');
+
+        $this->assertSame(200, config::items_per_page());
+    }
+
+    /**
      * Lifetimes fall back to the step defaults when unset or nonsensical.
      *
      * @return void
