@@ -105,6 +105,16 @@ if ($hassiteconfig) {
 
     $settings->add(
         new admin_setting_configtext(
+            'local_cleanup/maxrecordsperrun',
+            get_string('maxrecordsperrun', 'local_cleanup'),
+            get_string('maxrecordsperrundesc', 'local_cleanup'),
+            0,
+            PARAM_INT
+        )
+    );
+
+    $settings->add(
+        new admin_setting_configtext(
             'local_cleanup/componentfileslifetimedays',
             get_string('componentfileslifetime', 'local_cleanup'),
             get_string('componentfileslifetimedesc', 'local_cleanup'),

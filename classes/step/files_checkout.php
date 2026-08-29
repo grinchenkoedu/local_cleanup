@@ -18,6 +18,7 @@ namespace local_cleanup\step;
 
 use file_storage;
 use local_cleanup\output\output_interface;
+use local_cleanup\config;
 use local_cleanup\step_result;
 use moodle_database;
 use stored_file;
@@ -146,6 +147,7 @@ class files_checkout implements step_interface {
         );
 
         $result = new step_result();
+        $ceiling = config::max_records_per_run();
         $lastid = 0;
 
         do {
@@ -168,6 +170,12 @@ class files_checkout implements step_interface {
                 $this->remove($file, $output);
                 $result->add(1, (int)$row->filesize);
                 $output->write('.');
+
+                if ($ceiling > 0 && $result->get_records() >= $ceiling) {
+                    $result->note('Reached the per-run limit; the rest waits for the next run.');
+
+                    break 2;
+                }
             }
         } while (count($batch) === self::BATCH_SIZE);
 

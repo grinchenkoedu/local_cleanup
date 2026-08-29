@@ -138,6 +138,18 @@ class config {
     }
 
     /**
+     * Most records any one step may remove in a single run.
+     *
+     * Zero means no ceiling, which is the default: a limit that applied without being asked
+     * for would quietly leave work undone every night.
+     *
+     * @return int Maximum records per step per run, or 0 for no limit
+     */
+    public static function max_records_per_run(): int {
+        return max(0, (int)self::get('maxrecordsperrun'));
+    }
+
+    /**
      * Days that must pass between the two scans that agree a file is unlinked.
      *
      * @return int Days

@@ -17,6 +17,7 @@
 namespace local_cleanup\step;
 
 use local_cleanup\output\output_interface;
+use local_cleanup\config;
 use local_cleanup\step_result;
 use moodle_database;
 
@@ -97,14 +98,24 @@ abstract class base implements step_interface {
      */
     public function execute(output_interface $output): step_result {
         $result = new step_result();
+        $ceiling = config::max_records_per_run();
 
         foreach ($this->get_candidates() as $candidate) {
+            $remaining = $ceiling > 0 ? $ceiling - $result->get_records() : 0;
+
+            if ($ceiling > 0 && $remaining <= 0) {
+                $result->note('Reached the per-run limit; the rest waits for the next run.');
+
+                break;
+            }
+
             $result->add($this->process_records_in_batches(
                 $candidate['table'],
                 $candidate['sql'],
                 $candidate['params'],
                 $candidate['message'],
-                $output
+                $output,
+                $remaining
             ));
         }
 
@@ -123,6 +134,7 @@ abstract class base implements step_interface {
      * @param array $params Parameters for that query
      * @param string $message What is being cleaned, for the log
      * @param output_interface $output Output handler for progress
+     * @param int $ceiling Stop after this many records, or 0 for no limit
      * @return int Number of records deleted
      */
     protected function process_records_in_batches(
@@ -130,7 +142,8 @@ abstract class base implements step_interface {
         string $sql,
         array $params,
         string $message,
-        output_interface $output
+        output_interface $output,
+        int $ceiling = 0
     ): int {
         $output->write_line(sprintf('Cleaning %s: %s', $table, $message));
 
@@ -157,6 +170,11 @@ abstract class base implements step_interface {
                 break;
             }
 
+            if ($ceiling > 0 && $totaldeleted + $found > $ceiling) {
+                $ids = array_slice($ids, 0, $ceiling - $totaldeleted);
+                $found = count($ids);
+            }
+
             $lastid = end($ids);
             $output->write('Deleting..');
 
@@ -177,7 +195,7 @@ abstract class base implements step_interface {
                 intdiv($elapsedseconds, 60),
                 $elapsedseconds % 60
             ));
-        } while ($found === $pagesize);
+        } while ($found === $pagesize && ($ceiling === 0 || $totaldeleted < $ceiling));
 
         if ($totaldeleted === 0) {
             $output->write_line('None found.');

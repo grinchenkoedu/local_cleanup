@@ -17,6 +17,7 @@
 namespace local_cleanup\step;
 
 use local_cleanup\output\output_interface;
+use local_cleanup\config;
 use local_cleanup\step_result;
 use moodle_database;
 
@@ -117,6 +118,7 @@ class ghost_files_cleanup implements step_interface {
         );
         $reclaimed = 0;
         $waiting = 0;
+        $ceiling = $delete ? config::max_records_per_run() : 0;
 
         foreach ($ghostfiles as $item) {
             // The scan that recorded this file runs on its own schedule, so this list can be
@@ -153,6 +155,12 @@ class ghost_files_cleanup implements step_interface {
             }
 
             $this->db->delete_records('local_cleanup_files', ['id' => $item->id]);
+
+            if ($ceiling > 0 && $result->get_records() >= $ceiling) {
+                $result->note('Reached the per-run limit; the rest waits for the next run.');
+
+                break;
+            }
         }
 
         $ghostfiles->close();
