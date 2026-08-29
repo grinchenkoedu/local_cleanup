@@ -24,7 +24,6 @@ vendor/
 # Only the host Moodle config at the repository root. An unanchored
 # "config.php" also matched classes/config.php and silently dropped it.
 /config.php
-/config.php
 config-dist.php
 
 # Moodle cache directories
