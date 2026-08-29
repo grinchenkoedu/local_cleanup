@@ -120,9 +120,9 @@ abstract class AbstractCleanupStep implements CleanupStepInterface {
                     $output->write('.');
                 }
 
-                // microtime() gives a float, and % is an integer operation. Leaving PHP to
-                // convert implicitly is deprecated from 8.1 whenever precision is lost, which
-                // is every batch that does not take a whole number of seconds.
+                // The microtime() call gives a float, and % is an integer operation. Leaving
+                // PHP to convert implicitly is deprecated from 8.1 when precision is lost,
+                // which is every batch not taking a whole number of seconds.
                 $elapsedseconds = (int)round(microtime(true) - $starttime);
                 $output->writeLine(
                     sprintf(
