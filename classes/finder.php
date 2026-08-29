@@ -199,6 +199,11 @@ class finder {
         // The ORDER BY is what makes paging stable; without it the same row can appear on two
         // pages, or on none. Bounds are applied by the caller through the DML layer rather
         // than a literal LIMIT, which is not portable.
+        //
+        // Nothing indexes filesize on its own, so the unfiltered report scans and then sorts.
+        // That is a deliberate trade: correct paging is worth more than the early exit an
+        // unordered query allowed, and with a component filter set the component_filesize
+        // index serves this ordering. Do not remove it to save the sort.
         return sprintf(
             'SELECT %s FROM {files} f LEFT JOIN {user} u ON f.userid = u.id WHERE %s ORDER BY %s',
             'f.*, u.deleted as user_deleted, ' . $userfields,
