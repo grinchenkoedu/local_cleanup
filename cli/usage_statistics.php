@@ -27,27 +27,35 @@
 define('CLI_SCRIPT', true);
 
 require_once(__DIR__ . '/../../../config.php');
+require_once($CFG->libdir . '/clilib.php');
 
 use local_cleanup\finder;
 
-/**
- * Format file size with appropriate units.
- *
- * @package    local_cleanup
- * @param int $bytes Size in bytes
- * @param int $decimals Number of decimal places
- * @return string Formatted size with unit
- */
-function format_file_size($bytes, $decimals = 2) {
-    $units = ['bytes', 'KB', 'MB', 'GB', 'TB'];
+[$options, $unrecognised] = cli_get_params(
+    ['help' => false],
+    ['h' => 'help']
+);
 
-    $bytes = max($bytes, 0);
-    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-    $pow = min($pow, count($units) - 1);
+if ($unrecognised) {
+    cli_error(get_string('cliunknowoption', 'admin', implode(PHP_EOL . '  ', $unrecognised)));
+}
 
-    $bytes /= pow(1024, $pow);
+if ($options['help']) {
+    cli_writeln(<<<'USAGE'
+Report how much space the clean-up candidates occupy.
 
-    return round($bytes, $decimals) . ' ' . $units[$pow];
+Reads only. Prints per-component file counts and sizes, and row counts for the history tables,
+broken down by age so you can see what a given lifetime setting would remove.
+
+Usage:
+    php usage_statistics.php
+
+Options:
+    -h, --help    Show this text.
+
+USAGE);
+
+    exit(0);
 }
 
 $finder = new finder($DB);
@@ -65,7 +73,7 @@ foreach ($components as $component => $batchremoval) {
         "%s: %d files, %s",
         get_string($component, 'local_cleanup'),
         $stats->count,
-        format_file_size($stats->size)
+        display_size($stats->size)
     ));
 
     // Calculate statistics for specific time periods.
@@ -99,7 +107,7 @@ foreach ($components as $component => $batchremoval) {
             get_string($component, 'local_cleanup'),
             $perioddesc,
             $statsperiod->count,
-            format_file_size($statsperiod->size)
+            display_size($statsperiod->size)
         ));
     }
 }
@@ -171,7 +179,7 @@ foreach ($tables as $table => $datetimefield) {
         "%s: %d records, %s",
         $table,
         $count,
-        format_file_size($size)
+        display_size($size)
     ));
 
     // Calculate statistics for specific time periods.
@@ -215,7 +223,7 @@ foreach ($tables as $table => $datetimefield) {
             $table,
             $perioddesc,
             $countperiod,
-            format_file_size($sizeperiod)
+            display_size($sizeperiod)
         ));
     }
 }

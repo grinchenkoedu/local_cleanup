@@ -21,16 +21,54 @@
  * @copyright  2024 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @var moodle_database $DB
- * @var object $CFG
+ * @var stdClass $CFG
  */
 
 define('CLI_SCRIPT', true);
 
 require_once(__DIR__ . '/../../../config.php');
+require_once($CFG->libdir . '/clilib.php');
 
-if (!in_array($argv[1] ?? null, ['--force', '-f'])) {
-    mtrace('This script will reinitialize course modules clean-up and delete existing modules removal adhoc tasks.');
-    mtrace('To start the process, run this script with -f (--force) option e.g. "php reinit_modules_cleanup.php -f"');
+[$options, $unrecognised] = cli_get_params(
+    [
+        'help' => false,
+        'force' => false,
+    ],
+    [
+        'h' => 'help',
+        'f' => 'force',
+    ]
+);
+
+if ($unrecognised) {
+    cli_error(get_string('cliunknowoption', 'admin', implode(PHP_EOL . '  ', $unrecognised)));
+}
+
+$usage = <<<'USAGE'
+Reinitialise the clean-up of course modules stuck in "deletion in progress".
+
+Deletes every queued core_course\task\course_delete_modules adhoc task and queues a fresh one
+per course that still has modules marked for deletion. Requires the adhoc task cron to be
+running, or nothing will pick the new tasks up.
+
+Usage:
+    php reinit_modules_cleanup.php --force
+    php reinit_modules_cleanup.php --help
+
+Options:
+    -f, --force   Actually do it. Without this the script explains itself and stops.
+    -h, --help    Show this text.
+
+USAGE;
+
+if ($options['help']) {
+    cli_writeln($usage);
+
+    exit(0);
+}
+
+if (!$options['force']) {
+    cli_writeln($usage);
 
     exit(1);
 }

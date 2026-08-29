@@ -154,19 +154,25 @@ jobs:
       - name: Test CLI Scripts
         if: ${{ !cancelled() }}
         run: |
+          set -e
           cd ${GITHUB_WORKSPACE}/moodle
-          
-          # Test usage statistics
-          if [ -f "local/cleanup/cli/usage_statistics.php" ]; then
-            echo "Testing usage statistics script..."
-            php local/cleanup/cli/usage_statistics.php
+
+          echo "usage_statistics.php --help"
+          php local/cleanup/cli/usage_statistics.php --help
+          echo "usage_statistics.php"
+          php local/cleanup/cli/usage_statistics.php
+
+          echo "reinit_modules_cleanup.php --help"
+          php local/cleanup/cli/reinit_modules_cleanup.php --help
+
+          echo "reinit_modules_cleanup.php with no options must refuse"
+          if php local/cleanup/cli/reinit_modules_cleanup.php; then
+            echo "FAIL: it ran without --force"
+            exit 1
           fi
-          
-          # Test reinit modules cleanup (with force flag)
-          if [ -f "local/cleanup/cli/reinit_modules_cleanup.php" ]; then
-            echo "Testing reinit modules cleanup script..."
-            php local/cleanup/cli/reinit_modules_cleanup.php --force
-          fi
+
+          echo "reinit_modules_cleanup.php --force"
+          php local/cleanup/cli/reinit_modules_cleanup.php --force
 
       - name: Mark cancelled jobs as failed
         if: ${{ cancelled() }}
