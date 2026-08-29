@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace local_cleanup\steps;
+namespace local_cleanup\step;
 
-use local_cleanup\output\OutputInterface;
+use local_cleanup\output\output_interface;
 use moodle_database;
 
 /**
@@ -29,7 +29,7 @@ use moodle_database;
  * @copyright  2024 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class GradesCleanup extends AbstractCleanupStep {
+class grades_cleanup extends base {
     /**
      * Default number of days to keep grade history records.
      */
@@ -59,50 +59,50 @@ class GradesCleanup extends AbstractCleanupStep {
      *
      * Runs all grade cleanup operations in sequence.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    public function cleanup(OutputInterface $output) {
-        $output->writeLine('Starting grades cleanup...');
+    public function cleanup(output_interface $output) {
+        $output->write_line('Starting grades cleanup...');
 
         // 1. Clean up grade items tied to deleted courses.
-        $this->cleanupGradeItemsForDeletedCourses($output);
+        $this->cleanup_grade_items_for_deleted_courses($output);
 
         // 2. Clean up grade items for modules that no longer exist.
-        $this->cleanupGradeItemsForDeletedModules($output);
+        $this->cleanup_grade_items_for_deleted_modules($output);
 
         // 3. Clean up grade grades with no corresponding grade items.
-        $this->cleanupOrphanedGradeGrades($output);
+        $this->cleanup_orphaned_grade_grades($output);
 
         // 4. Clean up grade grades for deleted users.
-        $this->cleanupGradeGradesForDeletedUsers($output);
+        $this->cleanup_grade_grades_for_deleted_users($output);
 
         // 5. Clean up grade categories tied to deleted courses.
-        $this->cleanupGradeCategoriesForDeletedCourses($output);
+        $this->cleanup_grade_categories_for_deleted_courses($output);
 
         // 6. Clean up grade outcomes courses tied to deleted courses.
-        $this->cleanupGradeOutcomesCoursesForDeletedCourses($output);
+        $this->cleanup_grade_outcomes_courses_for_deleted_courses($output);
 
         // 7. Clean up grade grades history with no corresponding grade items.
-        $this->cleanupGradeGradesHistory($output);
+        $this->cleanup_grade_grades_history($output);
 
-        $output->writeLine('Grades cleanup completed.');
+        $output->write_line('Grades cleanup completed.');
     }
 
     /**
      * Clean up grade items tied to deleted courses.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    private function cleanupgradeitemsfordeletedcourses(OutputInterface $output) {
+    private function cleanup_grade_items_for_deleted_courses(output_interface $output) {
         $sql = "SELECT gi.id
                 FROM {grade_items} gi
                 LEFT JOIN {course} c ON gi.courseid = c.id
                 WHERE gi.courseid IS NOT NULL
                 AND c.id IS NULL";
 
-        $this->processRecordsInBatches(
+        $this->process_records_in_batches(
             'grade_items',
             'gi',
             $sql,
@@ -115,10 +115,10 @@ class GradesCleanup extends AbstractCleanupStep {
     /**
      * Clean up grade items for modules that no longer exist.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    private function cleanupgradeitemsfordeletedmodules(OutputInterface $output) {
+    private function cleanup_grade_items_for_deleted_modules(output_interface $output) {
         $sql = "SELECT gi.id
                 FROM {grade_items} gi
                 WHERE gi.itemtype = 'mod'
@@ -128,7 +128,7 @@ class GradesCleanup extends AbstractCleanupStep {
                     WHERE cm.course = gi.courseid AND cm.instance = gi.iteminstance
                 )";
 
-        $this->processRecordsInBatches(
+        $this->process_records_in_batches(
             'grade_items',
             'gi',
             $sql,
@@ -141,16 +141,16 @@ class GradesCleanup extends AbstractCleanupStep {
     /**
      * Clean up grade grades with no corresponding grade items.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    private function cleanuporphanedgradegrades(OutputInterface $output) {
+    private function cleanup_orphaned_grade_grades(output_interface $output) {
         $sql = "SELECT gg.id
                 FROM {grade_grades} gg
                 LEFT JOIN {grade_items} gi ON gi.id = gg.itemid
                 WHERE gi.id IS NULL";
 
-        $this->processRecordsInBatches(
+        $this->process_records_in_batches(
             'grade_grades',
             'gg',
             $sql,
@@ -163,16 +163,16 @@ class GradesCleanup extends AbstractCleanupStep {
     /**
      * Clean up grade grades for deleted users.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    private function cleanupgradegradesfordeletedusers(OutputInterface $output) {
+    private function cleanup_grade_grades_for_deleted_users(output_interface $output) {
         $sql = "SELECT gg.id
                 FROM {grade_grades} gg
                 LEFT JOIN {user} u ON gg.userid = u.id
                 WHERE u.id IS NULL";
 
-        $this->processRecordsInBatches(
+        $this->process_records_in_batches(
             'grade_grades',
             'gg',
             $sql,
@@ -185,16 +185,16 @@ class GradesCleanup extends AbstractCleanupStep {
     /**
      * Clean up grade categories tied to deleted courses.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    private function cleanupgradecategoriesfordeletedcourses(OutputInterface $output) {
+    private function cleanup_grade_categories_for_deleted_courses(output_interface $output) {
         $sql = "SELECT gc.id
                 FROM {grade_categories} gc
                 LEFT JOIN {course} c ON gc.courseid = c.id
                 WHERE c.id IS NULL";
 
-        $this->processRecordsInBatches(
+        $this->process_records_in_batches(
             'grade_categories',
             'gc',
             $sql,
@@ -207,16 +207,16 @@ class GradesCleanup extends AbstractCleanupStep {
     /**
      * Clean up grade outcomes courses tied to deleted courses.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    private function cleanupgradeoutcomescoursesfordeletedcourses(OutputInterface $output) {
+    private function cleanup_grade_outcomes_courses_for_deleted_courses(output_interface $output) {
         $sql = "SELECT goc.id
                 FROM {grade_outcomes_courses} goc
                 LEFT JOIN {course} c ON goc.courseid = c.id
                 WHERE c.id IS NULL";
 
-        $this->processRecordsInBatches(
+        $this->process_records_in_batches(
             'grade_outcomes_courses',
             'goc',
             $sql,
@@ -229,10 +229,10 @@ class GradesCleanup extends AbstractCleanupStep {
     /**
      * Clean up grade grades history with no corresponding grade items or older than the configured days to keep.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    private function cleanupgradegradeshistory(OutputInterface $output) {
+    private function cleanup_grade_grades_history(output_interface $output) {
         $cutoffdate = time() - ($this->daystokeep * 24 * 60 * 60);
 
         $sql = "SELECT ggh.id
@@ -240,7 +240,7 @@ class GradesCleanup extends AbstractCleanupStep {
                 LEFT JOIN {grade_items} gi ON ggh.itemid = gi.id
                 WHERE gi.id IS NULL OR ggh.timemodified < :cutoffdate";
 
-        $this->processRecordsInBatches(
+        $this->process_records_in_batches(
             'grade_grades_history',
             'ggh',
             $sql,

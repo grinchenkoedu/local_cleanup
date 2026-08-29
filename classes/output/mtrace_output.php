@@ -14,23 +14,33 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace local_cleanup\steps;
-
-use local_cleanup\output\OutputInterface;
+namespace local_cleanup\output;
 
 /**
- * Interface for cleanup steps.
+ * Output handler that uses Moodle's mtrace function.
  *
  * @package    local_cleanup
  * @copyright  2024 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-interface CleanupStepInterface {
+class mtrace_output implements output_interface {
     /**
-     * Execute the cleanup step.
+     * Write a message without a line break.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param string $message The message to write
      * @return void
      */
-    public function cleanup(OutputInterface $output);
+    public function write(string $message) {
+        mtrace($message, null);
+    }
+
+    /**
+     * Write a message with a line break.
+     *
+     * @param string $message The message to write
+     * @return void
+     */
+    public function write_line(string $message) {
+        mtrace($message);
+    }
 }

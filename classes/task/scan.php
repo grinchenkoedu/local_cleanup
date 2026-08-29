@@ -68,7 +68,7 @@ class scan extends scheduled_task {
      * Scans for unlinked files and reports the total size found.
      */
     public function execute() {
-        $sizetotal = $this->scanRecursive('filedir');
+        $sizetotal = $this->scan_recursive('filedir');
 
         mtrace(sprintf('Total found: %.3f GB', $sizetotal / 1024 / 1024 / 1024));
     }
@@ -80,7 +80,7 @@ class scan extends scheduled_task {
      * @param bool $printprogress Whether to print progress information
      * @return int Total size of unlinked files found in bytes
      */
-    private function scanrecursive(string $path, bool $printprogress = true): int {
+    private function scan_recursive(string $path, bool $printprogress = true): int {
         $sizetotal = 0;
         $absolute = $this->dataroot . DIRECTORY_SEPARATOR . $path;
         $list = scandir($absolute);
@@ -101,7 +101,7 @@ class scan extends scheduled_task {
                     ));
                 }
 
-                $sizetotal += $this->scanRecursive($path . DIRECTORY_SEPARATOR . $item, false);
+                $sizetotal += $this->scan_recursive($path . DIRECTORY_SEPARATOR . $item, false);
 
                 continue;
             }

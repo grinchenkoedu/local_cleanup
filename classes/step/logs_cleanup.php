@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace local_cleanup\steps;
+namespace local_cleanup\step;
 
-use local_cleanup\output\OutputInterface;
+use local_cleanup\output\output_interface;
 use moodle_database;
 
 /**
@@ -28,7 +28,7 @@ use moodle_database;
  * @copyright  2024 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class LogsCleanup extends AbstractCleanupStep {
+class logs_cleanup extends base {
     /**
      * Default number of days to keep logs.
      */
@@ -66,32 +66,32 @@ class LogsCleanup extends AbstractCleanupStep {
      *
      * Cleans up both standard and analytics logs.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    public function cleanup(OutputInterface $output) {
-        $output->writeLine('Starting logs cleanup...');
+    public function cleanup(output_interface $output) {
+        $output->write_line('Starting logs cleanup...');
 
-        $this->cleanupStandardLogs($output);
-        $this->cleanupLAnalyticsLogs($output);
+        $this->cleanup_standard_logs($output);
+        $this->cleanup_lanalytics_logs($output);
 
-        $output->writeLine('Logs cleanup completed.');
+        $output->write_line('Logs cleanup completed.');
     }
 
     /**
      * Clean up standard logs that are obsolete or older than the configured days to keep.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    private function cleanupstandardlogs(OutputInterface $output) {
+    private function cleanup_standard_logs(output_interface $output) {
         $sql = "SELECT l.id
                 FROM {logstore_standard_log} l
                 LEFT JOIN {context} ctx ON ctx.id = l.contextid
                 WHERE ctx.id IS NULL
                       OR l.timecreated < :cutoffdate";
 
-        $this->processRecordsInBatches(
+        $this->process_records_in_batches(
             'logstore_standard_log',
             'l',
             $sql,
@@ -107,12 +107,12 @@ class LogsCleanup extends AbstractCleanupStep {
     /**
      * Clean up learning analytics logs that are obsolete or older than the configured days to keep.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    private function cleanuplanalyticslogs(OutputInterface $output) {
+    private function cleanup_lanalytics_logs(output_interface $output) {
         if (!$this->db->get_manager()->table_exists('logstore_lanalytics_log')) {
-            $output->writeLine('Skipping cleanup of logstore_lanalytics_log: table does not exist.');
+            $output->write_line('Skipping cleanup of logstore_lanalytics_log: table does not exist.');
             return;
         }
 
@@ -122,7 +122,7 @@ class LogsCleanup extends AbstractCleanupStep {
                 WHERE ctx.id IS NULL
                       OR l.timecreated < :cutoffdate";
 
-        $this->processRecordsInBatches(
+        $this->process_records_in_batches(
             'logstore_lanalytics_log',
             'l',
             $sql,

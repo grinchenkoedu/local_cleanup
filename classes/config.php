@@ -16,11 +16,11 @@
 
 namespace local_cleanup;
 
-use local_cleanup\steps\ComponentFilesCleanup;
-use local_cleanup\steps\CourseModulesCleanup;
-use local_cleanup\steps\FilesCheckout;
-use local_cleanup\steps\GradesCleanup;
-use local_cleanup\steps\LogsCleanup;
+use local_cleanup\step\component_files_cleanup;
+use local_cleanup\step\course_modules_cleanup;
+use local_cleanup\step\files_checkout;
+use local_cleanup\step\grades_cleanup;
+use local_cleanup\step\logs_cleanup;
 
 /**
  * Typed access to the plugin's settings.
@@ -97,7 +97,7 @@ class config {
      * @return int Days
      */
     public static function backup_lifetime_days(): int {
-        return self::days('backuplifetimedays', FilesCheckout::DEFAULT_TIMEOUT_DAYS);
+        return self::days('backuplifetimedays', files_checkout::DEFAULT_TIMEOUT_DAYS);
     }
 
     /**
@@ -106,7 +106,7 @@ class config {
      * @return int Days
      */
     public static function draft_lifetime_days(): int {
-        return self::days('draftlifetimedays', FilesCheckout::DEFAULT_TIMEOUT_DAYS);
+        return self::days('draftlifetimedays', files_checkout::DEFAULT_TIMEOUT_DAYS);
     }
 
     /**
@@ -115,7 +115,7 @@ class config {
      * @return int Days
      */
     public static function logs_lifetime_days(): int {
-        return self::days('logslifetimedays', LogsCleanup::DEFAULT_LIFETIME_DAYS);
+        return self::days('logslifetimedays', logs_cleanup::DEFAULT_LIFETIME_DAYS);
     }
 
     /**
@@ -124,7 +124,7 @@ class config {
      * @return int Days
      */
     public static function component_files_lifetime_days(): int {
-        return self::days('componentfileslifetimedays', ComponentFilesCleanup::DEFAULT_LIFETIME_DAYS);
+        return self::days('componentfileslifetimedays', component_files_cleanup::DEFAULT_LIFETIME_DAYS);
     }
 
     /**
@@ -133,7 +133,7 @@ class config {
      * @return int Days
      */
     public static function grades_lifetime_days(): int {
-        return self::days('gradeslifetimedays', GradesCleanup::DEFAULT_LIFETIME_DAYS);
+        return self::days('gradeslifetimedays', grades_cleanup::DEFAULT_LIFETIME_DAYS);
     }
 
     /**
@@ -142,7 +142,7 @@ class config {
      * @return int Days
      */
     public static function course_modules_lifetime_days(): int {
-        return self::days('coursemoduleslifetimedays', CourseModulesCleanup::DEFAULT_LIFETIME_DAYS);
+        return self::days('coursemoduleslifetimedays', course_modules_cleanup::DEFAULT_LIFETIME_DAYS);
     }
 
     /**

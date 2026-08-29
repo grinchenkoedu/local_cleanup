@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace local_cleanup\steps;
+namespace local_cleanup\step;
 
 use file_storage;
-use local_cleanup\output\OutputInterface;
+use local_cleanup\output\output_interface;
 use moodle_database;
 use stored_file;
 
@@ -30,7 +30,7 @@ use stored_file;
  * @copyright  2024 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class FilesCheckout implements CleanupStepInterface {
+class files_checkout implements step_interface {
     /**
      * Empty string for selecting all records.
      */
@@ -94,17 +94,17 @@ class FilesCheckout implements CleanupStepInterface {
      *
      * Checks all files and removes outdated backups and draft files.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    public function cleanup(OutputInterface $output) {
+    public function cleanup(output_interface $output) {
         $output->write('Fetching records... ');
 
         $ids = $this->db->get_fieldset_select('files', 'id', self::SELECT_ALL);
         $count = count($ids);
         $progress = 0;
 
-        $output->writeLine(sprintf('%d records found.', count($ids)));
+        $output->write_line(sprintf('%d records found.', count($ids)));
         $output->write('Processing... ');
 
         foreach ($ids as $index => $id) {
@@ -127,10 +127,10 @@ class FilesCheckout implements CleanupStepInterface {
      * Check a file and remove it if it's outdated.
      *
      * @param int $id File ID to check
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return bool True if the file should be kept, false if it was removed
      */
-    private function checkout($id, OutputInterface $output): bool {
+    private function checkout($id, output_interface $output): bool {
         $file = $this->fs->get_file_by_id($id);
 
         if ($file === false) {
@@ -141,7 +141,7 @@ class FilesCheckout implements CleanupStepInterface {
         $resource = $this->fs->get_file_system()->get_content_file_handle($file);
 
         if ($resource === false) {
-            $output->writeLine(sprintf('File "%s" is not found or not readable. Removed.', $id));
+            $output->write_line(sprintf('File "%s" is not found or not readable. Removed.', $id));
 
             return false;
         }
@@ -155,7 +155,7 @@ class FilesCheckout implements CleanupStepInterface {
             && $this->is_last_reference($file)
         ) {
             unlink($uri);
-            $output->writeLine(sprintf(
+            $output->write_line(sprintf(
                 'Backup "%s" (%s) is outdated. Removed.',
                 $file->get_filename(),
                 $file->get_contenthash()
@@ -170,7 +170,7 @@ class FilesCheckout implements CleanupStepInterface {
             && $this->is_last_reference($file)
         ) {
             unlink($uri);
-            $output->writeLine(
+            $output->write_line(
                 sprintf(
                     'Outdated draft "%s" (%s). Removed.',
                     $file->get_filename(),

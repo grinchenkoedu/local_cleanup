@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace local_cleanup\steps;
+namespace local_cleanup\step;
 
 use advanced_testcase;
 use context_system;
@@ -26,7 +26,7 @@ use local_cleanup\output\spy_output;
  * @package    local_cleanup
  * @copyright  2026 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_cleanup\steps\LogsCleanup
+ * @covers     \local_cleanup\step\logs_cleanup
  */
 final class logs_cleanup_test extends advanced_testcase {
     /**
@@ -126,7 +126,7 @@ final class logs_cleanup_test extends advanced_testcase {
         global $DB;
 
         $output = new spy_output();
-        $step = new LogsCleanup($DB, self::KEEP_DAYS);
+        $step = new logs_cleanup($DB, self::KEEP_DAYS);
         $step->cleanup($output);
 
         return $output;

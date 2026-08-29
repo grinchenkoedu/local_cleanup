@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace local_cleanup\steps;
+namespace local_cleanup\step;
 
-use local_cleanup\output\OutputInterface;
+use local_cleanup\output\output_interface;
 use moodle_database;
 
 /**
@@ -28,7 +28,7 @@ use moodle_database;
  * @copyright  2024 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class GhostFilesCleanup implements CleanupStepInterface {
+class ghost_files_cleanup implements step_interface {
     /**
      * Database connection.
      *
@@ -59,10 +59,10 @@ class GhostFilesCleanup implements CleanupStepInterface {
      *
      * Removes ghost files that are tracked in the cleanup table.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    public function cleanup(OutputInterface $output) {
+    public function cleanup(output_interface $output) {
         $output->write('Deleting unlinked files... ');
 
         $ghostfiles = $this->db->get_recordset('local_cleanup_files', [], '', 'id, path');
@@ -94,11 +94,11 @@ class GhostFilesCleanup implements CleanupStepInterface {
         $ghostfiles->close();
 
         if ($reclaimed > 0) {
-            $output->writeLine(
+            $output->write_line(
                 sprintf('%d file(s) referenced again since the scan were kept.', $reclaimed)
             );
         }
 
-        $output->writeLine('Done!');
+        $output->write_line('Done!');
     }
 }

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace local_cleanup\steps;
+namespace local_cleanup\step;
 
 use advanced_testcase;
 use context_system;
@@ -26,7 +26,7 @@ use local_cleanup\output\spy_output;
  * @package    local_cleanup
  * @copyright  2026 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_cleanup\steps\GhostFilesCleanup
+ * @covers     \local_cleanup\step\ghost_files_cleanup
  */
 final class ghost_files_cleanup_test extends advanced_testcase {
     /**
@@ -163,7 +163,7 @@ final class ghost_files_cleanup_test extends advanced_testcase {
         global $CFG, $DB;
 
         $output = new spy_output();
-        $step = new GhostFilesCleanup($DB, $CFG->dataroot);
+        $step = new ghost_files_cleanup($DB, $CFG->dataroot);
         $step->cleanup($output);
 
         return $output;

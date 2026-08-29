@@ -19,7 +19,7 @@ namespace local_cleanup\output;
 /**
  * Output handler that records messages instead of printing them.
  *
- * Clean-up steps write progress through OutputInterface. In a test that output would
+ * Clean-up steps write progress through output_interface. In a test that output would
  * otherwise reach mtrace and be reported as unexpected output, so it is captured here and
  * made available for assertions.
  *
@@ -27,7 +27,7 @@ namespace local_cleanup\output;
  * @copyright  2026 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class spy_output implements OutputInterface {
+class spy_output implements output_interface {
     /**
      * Everything written, in order.
      *
@@ -51,7 +51,7 @@ class spy_output implements OutputInterface {
      * @param string $message The message to write
      * @return void
      */
-    public function writeline(string $message) {
+    public function write_line(string $message) {
         $this->messages[] = $message;
     }
 

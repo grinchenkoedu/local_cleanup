@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace local_cleanup\steps;
+namespace local_cleanup\step;
 
-use local_cleanup\output\OutputInterface;
+use local_cleanup\output\output_interface;
 use moodle_database;
 
 /**
@@ -28,7 +28,7 @@ use moodle_database;
  * @copyright  2024 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class ComponentFilesCleanup extends AbstractCleanupStep {
+class component_files_cleanup extends base {
     /**
      * Default number of days to keep component files.
      */
@@ -67,16 +67,16 @@ class ComponentFilesCleanup extends AbstractCleanupStep {
      *
      * Removes files from specified components that are older than the configured days to keep.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    public function cleanup(OutputInterface $output) {
-        $output->writeLine('Starting component files cleanup...');
+    public function cleanup(output_interface $output) {
+        $output->write_line('Starting component files cleanup...');
 
         $cutoffdate = time() - ($this->daystokeep * 24 * 60 * 60);
 
         foreach ($this->components as $component) {
-            $output->writeLine("Processing component '$component'...");
+            $output->write_line("Processing component '$component'...");
 
             $params = [
                 'component' => $component,
@@ -88,7 +88,7 @@ class ComponentFilesCleanup extends AbstractCleanupStep {
                     WHERE f.component = :component
                     AND f.timecreated < :cutoffdate";
 
-            $this->processRecordsInBatches(
+            $this->process_records_in_batches(
                 'files',
                 'f',
                 $sql,
@@ -98,6 +98,6 @@ class ComponentFilesCleanup extends AbstractCleanupStep {
             );
         }
 
-        $output->writeLine('Component files cleanup completed.');
+        $output->write_line('Component files cleanup completed.');
     }
 }

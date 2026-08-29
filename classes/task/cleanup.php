@@ -18,14 +18,14 @@ namespace local_cleanup\task;
 
 use core\task\scheduled_task;
 use local_cleanup\config;
-use local_cleanup\output\MtraceOutput;
-use local_cleanup\steps\CleanupStepInterface;
-use local_cleanup\steps\ComponentFilesCleanup;
-use local_cleanup\steps\CourseModulesCleanup;
-use local_cleanup\steps\FilesCheckout;
-use local_cleanup\steps\GhostFilesCleanup;
-use local_cleanup\steps\GradesCleanup;
-use local_cleanup\steps\LogsCleanup;
+use local_cleanup\output\mtrace_output;
+use local_cleanup\step\step_interface;
+use local_cleanup\step\component_files_cleanup;
+use local_cleanup\step\course_modules_cleanup;
+use local_cleanup\step\files_checkout;
+use local_cleanup\step\ghost_files_cleanup;
+use local_cleanup\step\grades_cleanup;
+use local_cleanup\step\logs_cleanup;
 
 /**
  * Scheduled task for database and disk cleanup.
@@ -52,10 +52,10 @@ class cleanup extends scheduled_task {
      * @return void
      */
     public function execute() {
-        $output = new MtraceOutput();
+        $output = new mtrace_output();
 
         foreach ($this->get_steps() as $step) {
-            $step->cleanUp($output);
+            $step->cleanup($output);
         }
     }
 
@@ -67,7 +67,7 @@ class cleanup extends scheduled_task {
      * classes may not be loadable yet, so a constructor that reads configuration breaks the
      * upgrade that installs it.
      *
-     * @return CleanupStepInterface[] Steps to run, in order
+     * @return step_interface[] Steps to run, in order
      */
     private function get_steps(): array {
         global $CFG, $DB;
@@ -75,24 +75,24 @@ class cleanup extends scheduled_task {
         $steps = [];
 
         if (config::autoremove_enabled()) {
-            $steps[] = new CourseModulesCleanup($DB, config::course_modules_lifetime_days());
-            $steps[] = new GradesCleanup($DB, config::grades_lifetime_days());
-            $steps[] = new LogsCleanup($DB, config::logs_lifetime_days());
+            $steps[] = new course_modules_cleanup($DB, config::course_modules_lifetime_days());
+            $steps[] = new grades_cleanup($DB, config::grades_lifetime_days());
+            $steps[] = new logs_cleanup($DB, config::logs_lifetime_days());
 
             // Nothing is cleaned up per component until an administrator names one, so an
             // empty list means this step has no work rather than a default set of victims.
             $components = config::component_files();
 
             if (!empty($components)) {
-                $steps[] = new ComponentFilesCleanup(
+                $steps[] = new component_files_cleanup(
                     $DB,
                     $components,
                     config::component_files_lifetime_days()
                 );
             }
 
-            $steps[] = new GhostFilesCleanup($DB, $CFG->dataroot);
-            $steps[] = new FilesCheckout(
+            $steps[] = new ghost_files_cleanup($DB, $CFG->dataroot);
+            $steps[] = new files_checkout(
                 $DB,
                 get_file_storage(),
                 config::backup_lifetime_days(),
