@@ -216,6 +216,67 @@ final class finder_test extends advanced_testcase {
     }
 
     /**
+     * The owner filter matches a full name given in either order, and the author field.
+     *
+     * @return void
+     */
+    public function test_filters_by_owner(): void {
+        $this->resetAfterTest();
+
+        $owner = $this->getDataGenerator()->create_user([
+            'firstname' => 'Zoe',
+            'lastname' => 'Quimby',
+        ]);
+        $other = $this->getDataGenerator()->create_user([
+            'firstname' => 'Alan',
+            'lastname' => 'Turing',
+        ]);
+
+        $wanted = $this->create_file('hers.txt', 'a ' . $this->token, 'local_cleanup', $owner->id);
+        $this->create_file('his.txt', 'b ' . $this->token, 'local_cleanup', $other->id);
+
+        $this->assertSame(
+            [$wanted->get_id()],
+            $this->find(['user_like' => 'Zoe Quimby']),
+            'A full name in first-last order should match.'
+        );
+        $this->assertSame(
+            [$wanted->get_id()],
+            $this->find(['user_like' => 'Quimby Zoe']),
+            'The same name in last-first order should match too.'
+        );
+    }
+
+    /**
+     * The deleted-owner filter keeps only files owned by a user marked deleted.
+     *
+     * The join to {user} is a LEFT JOIN, so this filter also excludes files with no owner at
+     * all. That is the behaviour the report relies on; it is asserted here so a change to the
+     * join does not pass unnoticed.
+     *
+     * @return void
+     */
+    public function test_filters_by_deleted_owner(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $gone = $this->getDataGenerator()->create_user();
+        $present = $this->getDataGenerator()->create_user();
+        $DB->set_field('user', 'deleted', 1, ['id' => $gone->id]);
+
+        $wanted = $this->create_file('orphan.txt', 'a ' . $this->token, 'local_cleanup', $gone->id);
+        $this->create_file('owned.txt', 'b ' . $this->token, 'local_cleanup', $present->id);
+        $this->create_file('ownerless.txt', 'c ' . $this->token, 'local_cleanup', null);
+
+        $this->assertSame(
+            [$wanted->get_id()],
+            $this->find(['user_deleted' => '1']),
+            'Only the file owned by the deleted user should be listed.'
+        );
+    }
+
+    /**
      * Run a search and return the matching file ids.
      *
      * @param array $overrides Filter values to override the defaults with
@@ -259,9 +320,15 @@ final class finder_test extends advanced_testcase {
      * @param string $filename Name of the file
      * @param string $content Content, which determines the size and the content hash
      * @param string $component Owning component
+     * @param int|null $userid Owner of the file, if any
      * @return stored_file The created file
      */
-    private function create_file(string $filename, string $content, string $component = 'local_cleanup'): stored_file {
+    private function create_file(
+        string $filename,
+        string $content,
+        string $component = 'local_cleanup',
+        ?int $userid = null
+    ): stored_file {
         $filerecord = [
             'contextid' => context_system::instance()->id,
             'component' => $component,
@@ -269,6 +336,7 @@ final class finder_test extends advanced_testcase {
             'itemid' => 0,
             'filepath' => '/',
             'filename' => $this->token . '_' . $filename,
+            'userid' => $userid,
         ];
 
         return get_file_storage()->create_file_from_string($filerecord, $content);
