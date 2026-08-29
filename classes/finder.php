@@ -58,8 +58,10 @@ class finder {
      */
     public function find(int $limit = self::LIMIT_DEFAULT, int $offset = 0, array $filter = []): moodle_recordset {
         return $this->db->get_recordset_sql(
-            $this->get_search_sql($filter, false, $limit, $offset),
-            $this->get_search_values($filter)
+            $this->get_search_sql($filter),
+            $this->get_search_values($filter),
+            $offset,
+            $limit
         );
     }
 
@@ -88,28 +90,36 @@ class finder {
      * @throws dml_exception
      */
     public function stats(string $component, ?string $until = null, bool $newerthan = false, ?string $from = null) {
+        // Every file area carries a "." directory record with no content. It is not a file and
+        // must not be counted as one.
         $sql = '
             SELECT
                 COUNT(f.id) as "count",
                 COALESCE(SUM(f.filesize), 0) as "size"
             FROM {files} f
-            WHERE f.component = ?
+            WHERE f.component = :component
+              AND f.filename <> :directory
         ';
+        $params = [
+            'component' => $component,
+            'directory' => '.',
+        ];
 
         // For backup component, use timemodified instead of timecreated.
         $timefield = ($component === 'backup') ? 'f.timemodified' : 'f.timecreated';
 
         // If both from and until are provided, get files in the specific time period.
         if ($from !== null && $until !== null) {
-            $fromtimestamp = strtotime($from);
-            $untiltimestamp = strtotime($until);
-            $sql .= " AND $timefield >= $fromtimestamp AND $timefield < $untiltimestamp";
+            $sql .= " AND $timefield >= :fromtime AND $timefield < :untiltime";
+            $params['fromtime'] = strtotime($from);
+            $params['untiltime'] = strtotime($until);
         } else if ($until !== null) {
             $operator = $newerthan ? '>' : '<';
-            $sql .= " AND $timefield $operator " . strtotime($until);
+            $sql .= " AND $timefield $operator :untiltime";
+            $params['untiltime'] = strtotime($until);
         }
 
-        return $this->db->get_record_sql($sql, [$component]);
+        return $this->db->get_record_sql($sql, $params);
     }
 
     /**
@@ -119,14 +129,21 @@ class finder {
      * @return array Parameter values for SQL query
      */
     private function get_search_values(array $filter): array {
-        $values = [];
+        $values = [
+            'filesize' => ($filter['filesize'] ?? 0) * 1024 * 1024,
+        ];
 
         if (!empty($filter['name_like'])) {
-            $values['name_like'] = '%' . $filter['name_like'] . '%';
+            $values['name_like'] = '%' . $this->db->sql_like_escape($filter['name_like']) . '%';
         }
 
         if (!empty($filter['user_like'])) {
-            $values['user_like'] = '%' . $filter['user_like'] . '%';
+            // The owner clause tests three expressions, and a named parameter is bound once
+            // each, so the same value is supplied under three names.
+            $userlike = '%' . $this->db->sql_like_escape($filter['user_like']) . '%';
+            $values['user_like'] = $userlike;
+            $values['user_like_reversed'] = $userlike;
+            $values['user_like_author'] = $userlike;
         }
 
         if (!empty($filter['component'])) {
@@ -141,18 +158,11 @@ class finder {
      *
      * @param array $filter Filter criteria
      * @param bool $count Whether this is for counting (true) or selecting records (false)
-     * @param int $limit Maximum number of records to return
-     * @param int $offset Offset for pagination
      * @return string SQL query
      */
-    private function get_search_sql(
-        array $filter,
-        bool $count = false,
-        int $limit = self::LIMIT_DEFAULT,
-        $offset = 0
-    ): string {
+    private function get_search_sql(array $filter, bool $count = false): string {
         $where = [
-            sprintf('f.filesize > %d', ($filter['filesize'] ?? 0) * 1024 * 1024),
+            'f.filesize > :filesize',
         ];
 
         if (!empty($filter['component'])) {
@@ -160,16 +170,20 @@ class finder {
         }
 
         if (!empty($filter['name_like'])) {
-            $where[] = 'f.filename LIKE :name_like';
+            // Use sql_like() rather than a bare LIKE: it is case-insensitive on every
+            // engine, where plain LIKE matches case-sensitively on PostgreSQL but not MySQL.
+            $where[] = $this->db->sql_like('f.filename', ':name_like', false);
         }
 
         if (!empty($filter['user_like'])) {
             // Use database-agnostic concatenation via Moodle's sql_concat.
             $fullname1 = $this->db->sql_concat('u.firstname', "' '", 'u.lastname');
             $fullname2 = $this->db->sql_concat('u.lastname', "' '", 'u.firstname');
-            $where[] = "($fullname1 LIKE :user_like"
-                      . " OR $fullname2 LIKE :user_like"
-                      . " OR f.author LIKE :user_like)";
+            $where[] = '('
+                . $this->db->sql_like($fullname1, ':user_like', false)
+                . ' OR ' . $this->db->sql_like($fullname2, ':user_like_reversed', false)
+                . ' OR ' . $this->db->sql_like('f.author', ':user_like_author', false)
+                . ')';
         }
 
         if (!empty($filter['user_deleted'])) {
@@ -187,11 +201,23 @@ class finder {
             ->get_sql('u', false, '', '', false)
             ->selects;
 
+        // Records that share a content hash are still separate records, each listed and each
+        // deleted on its own, so they are no longer collapsed. Collapsing them also selected
+        // columns that were neither grouped nor aggregated, which PostgreSQL rejects outright.
+        //
+        // The ORDER BY is what makes paging stable; without it the same row can appear on two
+        // pages, or on none. Bounds are applied by the caller through the DML layer rather
+        // than a literal LIMIT, which is not portable.
+        //
+        // Nothing indexes filesize on its own, so the unfiltered report scans and then sorts.
+        // That is a deliberate trade: correct paging is worth more than the early exit an
+        // unordered query allowed, and with a component filter set the component_filesize
+        // index serves this ordering. Do not remove it to save the sort.
         return sprintf(
-            'SELECT %s FROM {files} f LEFT JOIN {user} u ON f.userid = u.id WHERE %s GROUP BY f.contenthash %s',
+            'SELECT %s FROM {files} f LEFT JOIN {user} u ON f.userid = u.id WHERE %s ORDER BY %s',
             'f.*, u.deleted as user_deleted, ' . $userfields,
             implode(' AND ', $where),
-            $offset > 0 ? sprintf('LIMIT %d OFFSET %d', $limit, $offset) : sprintf('LIMIT %d', $limit)
+            'f.filesize DESC, f.id ASC'
         );
     }
 }
