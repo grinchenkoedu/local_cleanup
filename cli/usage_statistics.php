@@ -31,7 +31,7 @@ require_once($CFG->libdir . '/clilib.php');
 
 use local_cleanup\finder;
 
-list($options, $unrecognised) = cli_get_params(
+[$options, $unrecognised] = cli_get_params(
     ['help' => false],
     ['h' => 'help']
 );
@@ -41,7 +41,7 @@ if ($unrecognised) {
 }
 
 if ($options['help']) {
-    cli_writeln(<<<USAGE
+    cli_writeln(<<<'USAGE'
 Report how much space the clean-up candidates occupy.
 
 Reads only. Prints per-component file counts and sizes, and row counts for the history tables,

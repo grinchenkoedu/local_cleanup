@@ -29,7 +29,7 @@ define('CLI_SCRIPT', true);
 require_once(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir . '/clilib.php');
 
-list($options, $unrecognised) = cli_get_params(
+[$options, $unrecognised] = cli_get_params(
     [
         'help' => false,
         'force' => false,
@@ -44,7 +44,7 @@ if ($unrecognised) {
     cli_error(get_string('cliunknowoption', 'admin', implode(PHP_EOL . '  ', $unrecognised)));
 }
 
-$usage = <<<USAGE
+$usage = <<<'USAGE'
 Reinitialise the clean-up of course modules stuck in "deletion in progress".
 
 Deletes every queued core_course\task\course_delete_modules adhoc task and queues a fresh one
