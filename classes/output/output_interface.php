@@ -23,7 +23,7 @@ namespace local_cleanup\output;
  * @copyright  2024 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-interface OutputInterface {
+interface output_interface {
     /**
      * Write a message without a line break.
      *
@@ -38,5 +38,5 @@ interface OutputInterface {
      * @param string $message The message to write
      * @return void
      */
-    public function writeline(string $message);
+    public function write_line(string $message);
 }

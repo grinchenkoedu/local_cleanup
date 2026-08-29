@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace local_cleanup\steps;
+namespace local_cleanup\step;
 
 use Throwable;
-use local_cleanup\output\OutputInterface;
+use local_cleanup\output\output_interface;
 use moodle_database;
 
 /**
@@ -29,7 +29,7 @@ use moodle_database;
  * @copyright  2024 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class CourseModulesCleanup implements CleanupStepInterface {
+class course_modules_cleanup implements step_interface {
     /**
      * Default number of days to keep course modules.
      */
@@ -63,13 +63,13 @@ class CourseModulesCleanup implements CleanupStepInterface {
      *
      * Cleans up orphaned course modules and failed course module deletion tasks.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    public function cleanup(OutputInterface $output) {
+    public function cleanup(output_interface $output) {
         global $CFG;
 
-        $this->cleanUpOrphanedCourseModules($output);
+        $this->clean_up_orphaned_course_modules($output);
 
         $cutofftime = time() - ($this->daystokeep * 24 * 60 * 60);
 
@@ -91,9 +91,9 @@ class CourseModulesCleanup implements CleanupStepInterface {
 
             foreach ($customdata->cms as $cm) {
                 try {
-                    $this->deleteCourseModule($cm->id, $output);
+                    $this->delete_course_module($cm->id, $output);
                 } catch (Throwable $e) {
-                    $output->writeLine(sprintf('Failed to delete course module %d: %s', $cm->id, $e->getMessage()));
+                    $output->write_line(sprintf('Failed to delete course module %d: %s', $cm->id, $e->getMessage()));
                     $success = false;
                 }
             }
@@ -111,16 +111,16 @@ class CourseModulesCleanup implements CleanupStepInterface {
      * and falls back to manual cleanup if that fails.
      *
      * @param int $id Course module ID
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    private function deletecoursemodule(int $id, OutputInterface $output) {
+    private function delete_course_module(int $id, output_interface $output) {
         $output->write(sprintf('Deleting course module %d...', $id));
 
         $cm = $this->db->get_record('course_modules', ['id' => $id]);
 
         if (!$cm) {
-            $output->writeLine('Failed: Course module not found.');
+            $output->write_line('Failed: Course module not found.');
 
             return;
         }
@@ -134,17 +134,17 @@ class CourseModulesCleanup implements CleanupStepInterface {
             // is not an Exception. Narrowing here would skip the manual clean-up below in
             // exactly the cases it was written for. The moodle_exception check that follows
             // is only meaningful because non-Moodle throwables reach this point.
-            $output->writeLine('Failed: ' . $e->getMessage());
+            $output->write_line('Failed: ' . $e->getMessage());
 
             if ($e instanceof \moodle_exception && $e->errorcode == 'cannotdeletemodulemissinglib') {
                 return;
             }
 
             $output->write('Failed to remove normally. Now trying to clean-up... ');
-            $this->cleanUpCourseModuleData($cm);
+            $this->clean_up_course_module_data($cm);
         }
 
-        $output->writeLine('OK');
+        $output->write_line('OK');
     }
 
     /**
@@ -152,13 +152,13 @@ class CourseModulesCleanup implements CleanupStepInterface {
      *
      * Identifies and removes course modules that reference courses that no longer exist.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    private function cleanuporphanedcoursemodules(OutputInterface $output): void {
+    private function clean_up_orphaned_course_modules(output_interface $output): void {
         global $CFG;
 
-        $output->writeLine('Checking for course modules tied to deleted courses...');
+        $output->write_line('Checking for course modules tied to deleted courses...');
 
         $sql = "SELECT cm.* "
                 . "FROM {course_modules} cm "
@@ -168,23 +168,23 @@ class CourseModulesCleanup implements CleanupStepInterface {
         $orphanedmodules = $this->db->get_records_sql($sql);
 
         if (empty($orphanedmodules)) {
-            $output->writeLine('No orphaned course modules found.');
+            $output->write_line('No orphaned course modules found.');
             return;
         }
 
-        $output->writeLine(sprintf('Found %d orphaned course modules. Cleaning up...', count($orphanedmodules)));
+        $output->write_line(sprintf('Found %d orphaned course modules. Cleaning up...', count($orphanedmodules)));
 
         require_once($CFG->dirroot . '/course/lib.php');
 
         foreach ($orphanedmodules as $cm) {
             try {
-                $this->deleteCourseModule($cm->id, $output);
+                $this->delete_course_module($cm->id, $output);
             } catch (Throwable $e) {
-                $output->writeLine(sprintf('Failed to delete orphaned course module %d: %s', $cm->id, $e->getMessage()));
+                $output->write_line(sprintf('Failed to delete orphaned course module %d: %s', $cm->id, $e->getMessage()));
             }
         }
 
-        $output->writeLine('Orphaned course modules cleanup completed.');
+        $output->write_line('Orphaned course modules cleanup completed.');
     }
 
     /**
@@ -197,7 +197,7 @@ class CourseModulesCleanup implements CleanupStepInterface {
      * @return void
      * @see course_delete_module
      */
-    private function cleanupcoursemoduledata($cm): void {
+    private function clean_up_course_module_data($cm): void {
         $modcontext = \context_module::instance($cm->id);
         $modulename = $this->db->get_field('modules', 'name', ['id' => $cm->module], MUST_EXIST);
 

@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace local_cleanup\steps;
+namespace local_cleanup\step;
 
-use local_cleanup\output\OutputInterface;
+use local_cleanup\output\output_interface;
 use moodle_database;
 
 /**
@@ -26,7 +26,7 @@ use moodle_database;
  * @copyright  2024 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-abstract class AbstractCleanupStep implements CleanupStepInterface {
+abstract class base implements step_interface {
     /**
      * Database connection.
      *
@@ -51,10 +51,10 @@ abstract class AbstractCleanupStep implements CleanupStepInterface {
     /**
      * Execute the cleanup step.
      *
-     * @param OutputInterface $output Output handler for logging
+     * @param output_interface $output Output handler for logging
      * @return void
      */
-    abstract public function cleanup(OutputInterface $output);
+    abstract public function cleanup(output_interface $output);
 
     /**
      * Process records in batches and delete them
@@ -64,17 +64,17 @@ abstract class AbstractCleanupStep implements CleanupStepInterface {
      * @param string $sql The SQL query to find records to delete
      * @param array $params The parameters for the SQL query
      * @param string $message The message to display when checking for records
-     * @param OutputInterface $output The output interface for logging
+     * @param output_interface $output The output interface for logging
      */
-    protected function processrecordsinbatches(
+    protected function process_records_in_batches(
         $table,
         $alias,
         $sql,
         $params,
         $message,
-        OutputInterface $output
+        output_interface $output
     ): void {
-        $output->writeLine(sprintf('Cleaning %s: %s', $table, $message));
+        $output->write_line(sprintf('Cleaning %s: %s', $table, $message));
 
         $limit = self::BATCH_SIZE * 100;
         $totaldeleted = 0;
@@ -83,7 +83,7 @@ abstract class AbstractCleanupStep implements CleanupStepInterface {
 
         do {
             if ($batchnumber > 0) {
-                $output->writeLine(
+                $output->write_line(
                     sprintf(
                         'Cleaning %s: Loading batch %d...',
                         $table,
@@ -124,7 +124,7 @@ abstract class AbstractCleanupStep implements CleanupStepInterface {
                 // PHP to convert implicitly is deprecated from 8.1 when precision is lost,
                 // which is every batch not taking a whole number of seconds.
                 $elapsedseconds = (int)round(microtime(true) - $starttime);
-                $output->writeLine(
+                $output->write_line(
                     sprintf(
                         'OK (took %02d:%02d)',
                         intdiv($elapsedseconds, 60),
@@ -135,11 +135,11 @@ abstract class AbstractCleanupStep implements CleanupStepInterface {
         } while ($count === $limit);
 
         if ($totaldeleted === 0) {
-            $output->writeLine('None found.');
+            $output->write_line('None found.');
 
             return;
         }
 
-        $output->writeLine("Total records deleted: $totaldeleted. Done.");
+        $output->write_line("Total records deleted: $totaldeleted. Done.");
     }
 }

@@ -73,7 +73,7 @@ class filter_form extends moodleform {
         ]);
         $form->setDefault('filesize', $filesize);
 
-        $form->addGroup($this->getButtons(), 'buttonarr', '', [' '], false);
+        $form->addGroup($this->get_buttons(), 'buttonarr', '', [' '], false);
 
         $form->disable_form_change_checker();
     }
@@ -83,7 +83,7 @@ class filter_form extends moodleform {
      *
      * @return array Array of form elements for the buttons
      */
-    private function getbuttons() {
+    private function get_buttons() {
         return [
             $this->_form->createElement('submit', 'submitbutton', get_string('search')),
             $this->_form->createElement('cancel'),
