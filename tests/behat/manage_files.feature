@@ -7,7 +7,6 @@ Feature: Review the files reports
   Background:
     Given the following "users" exist:
       | username | firstname | lastname | email                |
-      | teacher1 | Teacher   | One      | teacher1@example.com |
       | manager1 | Manager   | One      | manager1@example.com |
     And the following "role assigns" exist:
       | user     | role    | contextlevel | reference |
@@ -33,17 +32,5 @@ Feature: Review the files reports
     Then I should see "Nothing to show"
     And I should not see "you do not currently have permissions"
 
-  Scenario: A manager cannot delete without the deletion capability
-    Given I log in as "manager1"
-    When I visit "/local/cleanup/remove.php?id=1"
-    Then I should see "you do not currently have permissions"
-
-  Scenario: A teacher cannot reach the files report
-    Given I log in as "teacher1"
-    When I visit "/local/cleanup/files.php"
-    Then I should see "you do not currently have permissions"
-
-  Scenario: A teacher cannot reach the unlinked files report
-    Given I log in as "teacher1"
-    When I visit "/local/cleanup/ghost.php"
-    Then I should see "you do not currently have permissions"
+# Denial is asserted in tests/access_test.php: Behat fails a step whose page raises a
+# Moodle exception, so a required_capability_exception cannot be asserted from a feature.
