@@ -13,12 +13,14 @@ Feature: Review the files reports
     Given I log in as "admin"
     When I visit "/local/cleanup/files.php"
     Then I should see "Files"
+    And I should see "Nothing to show"
     And I should not see "Forbidden"
 
   Scenario: A site administrator can open the unlinked files report
     Given I log in as "admin"
     When I visit "/local/cleanup/ghost.php"
     Then I should see "Unlinked files"
+    And I should see "Nothing to show"
     And I should not see "Forbidden"
 
   Scenario: A teacher cannot reach the files report
