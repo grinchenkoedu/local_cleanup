@@ -29,7 +29,7 @@
  * @throws ddl_exception
  */
 function xmldb_local_cleanup_upgrade($oldversion = 0) {
-    global $DB;
+    global $CFG, $DB;
 
     $manager = $DB->get_manager();
 
@@ -81,6 +81,38 @@ function xmldb_local_cleanup_upgrade($oldversion = 0) {
         }
 
         upgrade_plugin_savepoint(true, 2026082800, 'local', 'cleanup');
+    }
+
+    if ($oldversion < 2026082902) {
+        // Settings move from core config to the plugin's own namespace. Carry each value
+        // across so an upgraded site keeps the configuration it already had.
+        $renames = [
+            'cleanup_items_per_page' => 'itemsperpage',
+            'cleanup_backup_timeout_days' => 'backuplifetimedays',
+            'cleanup_draft_timeout' => 'draftlifetimedays',
+            'cleanup_logs_timeout_days' => 'logslifetimedays',
+            'cleanup_component_files_days' => 'componentfileslifetimedays',
+            'cleanup_grades_days' => 'gradeslifetimedays',
+            'cleanup_course_modules_days' => 'coursemoduleslifetimedays',
+            'cleanup_run_autoremove' => 'autoremove',
+        ];
+
+        $wasautoremoveon = !empty($CFG->cleanup_run_autoremove);
+
+        foreach ($renames as $old => $new) {
+            if (isset($CFG->$old)) {
+                set_config($new, $CFG->$old, 'local_cleanup');
+                unset_config($old);
+            }
+        }
+
+        // The set of components to clean up used to be hardcoded, and now it is a setting
+        // that starts empty. A site already running automatic removal was relying on the old
+        // pair, so keep it; anywhere else the safe default stands and nothing is deleted per
+        // component until somebody ticks a box.
+        set_config('componentfiles', $wasautoremoveon ? 'backup,assignsubmission_file' : '', 'local_cleanup');
+
+        upgrade_plugin_savepoint(true, 2026082902, 'local', 'cleanup');
     }
 
     return true;

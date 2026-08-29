@@ -30,6 +30,7 @@
 require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir . '/formslib.php');
 
+use local_cleanup\config;
 use local_cleanup\finder;
 use local_cleanup\form\filter_form;
 
@@ -43,7 +44,7 @@ require_login();
 require_capability('local/cleanup:view', context_system::instance());
 
 $page = optional_param('page', 0, PARAM_INT);
-$limit = $CFG->cleanup_items_per_page ?? finder::LIMIT_DEFAULT;
+$limit = config::items_per_page();
 
 $filter = [
     'filesize' => optional_param('filesize', 50, PARAM_INT),

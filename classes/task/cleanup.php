@@ -17,6 +17,7 @@
 namespace local_cleanup\task;
 
 use core\task\scheduled_task;
+use local_cleanup\config;
 use file_storage;
 use local_cleanup\output\MtraceOutput;
 use local_cleanup\steps\CleanupStepInterface;
@@ -100,6 +101,13 @@ class cleanup extends scheduled_task {
     private $componentfilesdays;
 
     /**
+     * Components the administrator opted in to cleaning up.
+     *
+     * @var string[]
+     */
+    private $componentfiles = [];
+
+    /**
      * Number of days to keep grades.
      *
      * @var int
@@ -123,16 +131,14 @@ class cleanup extends scheduled_task {
 
         $this->db = $DB;
         $this->dataroot = $CFG->dataroot;
-        $this->backuptimeout = $CFG->cleanup_backup_timeout_days ?? FilesCheckout::DEFAULT_TIMEOUT_DAYS;
-        $this->drafttimeout = $CFG->cleanup_draft_timeout ?? FilesCheckout::DEFAULT_TIMEOUT_DAYS;
-        $this->logstimeout = $CFG->cleanup_logs_timeout_days ?? LogsCleanup::DEFAULT_LIFETIME_DAYS;
-        $this->componentfilesdays = $CFG->cleanup_component_files_days ?? ComponentFilesCleanup::DEFAULT_LIFETIME_DAYS;
-        $this->gradesdays = $CFG->cleanup_grades_days ?? GradesCleanup::DEFAULT_LIFETIME_DAYS;
-        $this->coursemodulesdays = $CFG->cleanup_course_modules_days ?? CourseModulesCleanup::DEFAULT_LIFETIME_DAYS;
-        // Read with empty() rather than a cast: the setting is absent until it is saved
-        // once, and (bool)$CFG->... evaluates the property before ?? can default it, so
-        // the cast emitted "Undefined property" and ?? never applied to a non-null bool.
-        $this->isautoremoveenabled = !empty($CFG->cleanup_run_autoremove);
+        $this->backuptimeout = config::backup_lifetime_days();
+        $this->drafttimeout = config::draft_lifetime_days();
+        $this->logstimeout = config::logs_lifetime_days();
+        $this->componentfilesdays = config::component_files_lifetime_days();
+        $this->componentfiles = config::component_files();
+        $this->gradesdays = config::grades_lifetime_days();
+        $this->coursemodulesdays = config::course_modules_lifetime_days();
+        $this->isautoremoveenabled = config::autoremove_enabled();
         $this->fs = get_file_storage();
 
         $this->initializeSteps();
@@ -168,10 +174,15 @@ class cleanup extends scheduled_task {
             $this->steps[] = new CourseModulesCleanup($this->db, $this->coursemodulesdays);
             $this->steps[] = new GradesCleanup($this->db, $this->gradesdays);
             $this->steps[] = new LogsCleanup($this->db, $this->logstimeout);
-            $this->steps[] = new ComponentFilesCleanup($this->db, [
-                'assignsubmission_file',
-                'backup',
-            ], $this->componentfilesdays);
+            // Nothing is cleaned up per component until an administrator names one, so an
+            // empty list means this step has no work rather than a default set of victims.
+            if (!empty($this->componentfiles)) {
+                $this->steps[] = new ComponentFilesCleanup(
+                    $this->db,
+                    $this->componentfiles,
+                    $this->componentfilesdays
+                );
+            }
             $this->steps[] = new GhostFilesCleanup($this->db, $this->dataroot);
             $this->steps[] = new FilesCheckout($this->db, $this->fs, $this->backuptimeout, $this->drafttimeout);
         }

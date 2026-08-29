@@ -60,7 +60,7 @@ if ($hassiteconfig) {
 
     $settings->add(
         new admin_setting_configtext(
-            'cleanup_items_per_page',
+            'local_cleanup/itemsperpage',
             get_string('itemsperpage', 'local_cleanup'),
             get_string('itemsperpagedesc', 'local_cleanup'),
             local_cleanup\finder::LIMIT_DEFAULT,
@@ -69,38 +69,38 @@ if ($hassiteconfig) {
     );
 
     $settings->add(
-        new admin_setting_configtext(
-            'cleanup_backup_timeout_days',
-            get_string('backuplifetime', 'local_cleanup'),
-            get_string('backuplifetimedesc', 'local_cleanup'),
-            30,
-            PARAM_INT
+        new admin_setting_configcheckbox(
+            'local_cleanup/autoremove',
+            get_string('autoremove', 'local_cleanup'),
+            get_string('autoremovedesc', 'local_cleanup'),
+            0 // Disabled by default.
+        )
+    );
+
+    // Which components may lose files is a deliberate choice, so the list starts empty and
+    // the options are fixed. Recommended ones are marked in their labels.
+    $componentchoices = [];
+
+    foreach (local_cleanup\config::CLEANABLE_COMPONENTS as $component => $recommended) {
+        $label = get_string('component_' . $component, 'local_cleanup');
+        $componentchoices[$component] = $recommended
+            ? $label . ' ' . get_string('componentrecommended', 'local_cleanup')
+            : $label;
+    }
+
+    $settings->add(
+        new admin_setting_configmulticheckbox(
+            'local_cleanup/componentfiles',
+            get_string('componentfiles', 'local_cleanup'),
+            get_string('componentfilesdesc', 'local_cleanup'),
+            [],
+            $componentchoices
         )
     );
 
     $settings->add(
         new admin_setting_configtext(
-            'cleanup_draft_timeout',
-            get_string('draftlifetime', 'local_cleanup'),
-            get_string('draftlifetimedesc', 'local_cleanup'),
-            30,
-            PARAM_INT
-        )
-    );
-
-    $settings->add(
-        new admin_setting_configtext(
-            'cleanup_logs_timeout_days',
-            get_string('logslifetime', 'local_cleanup'),
-            get_string('logslifetimedesc', 'local_cleanup'),
-            500,
-            PARAM_INT
-        )
-    );
-
-    $settings->add(
-        new admin_setting_configtext(
-            'cleanup_component_files_days',
+            'local_cleanup/componentfileslifetimedays',
             get_string('componentfileslifetime', 'local_cleanup'),
             get_string('componentfileslifetimedesc', 'local_cleanup'),
             180,
@@ -110,7 +110,37 @@ if ($hassiteconfig) {
 
     $settings->add(
         new admin_setting_configtext(
-            'cleanup_grades_days',
+            'local_cleanup/backuplifetimedays',
+            get_string('backuplifetime', 'local_cleanup'),
+            get_string('backuplifetimedesc', 'local_cleanup'),
+            30,
+            PARAM_INT
+        )
+    );
+
+    $settings->add(
+        new admin_setting_configtext(
+            'local_cleanup/draftlifetimedays',
+            get_string('draftlifetime', 'local_cleanup'),
+            get_string('draftlifetimedesc', 'local_cleanup'),
+            30,
+            PARAM_INT
+        )
+    );
+
+    $settings->add(
+        new admin_setting_configtext(
+            'local_cleanup/logslifetimedays',
+            get_string('logslifetime', 'local_cleanup'),
+            get_string('logslifetimedesc', 'local_cleanup'),
+            500,
+            PARAM_INT
+        )
+    );
+
+    $settings->add(
+        new admin_setting_configtext(
+            'local_cleanup/gradeslifetimedays',
             get_string('gradeslifetime', 'local_cleanup'),
             get_string('gradeslifetimedesc', 'local_cleanup'),
             500,
@@ -120,20 +150,11 @@ if ($hassiteconfig) {
 
     $settings->add(
         new admin_setting_configtext(
-            'cleanup_course_modules_days',
+            'local_cleanup/coursemoduleslifetimedays',
             get_string('coursemoduleslifetime', 'local_cleanup'),
             get_string('coursemoduleslifetimedesc', 'local_cleanup'),
             7,
             PARAM_INT
-        )
-    );
-
-    $settings->add(
-        new admin_setting_configcheckbox(
-            'cleanup_run_autoremove',
-            get_string('autoremove', 'local_cleanup'),
-            get_string('autoremovedesc', 'local_cleanup'),
-            0 // Disabled by default.
         )
     );
 }
