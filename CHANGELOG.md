@@ -4,6 +4,24 @@ All notable changes to the Moodle Clean-up Plugin will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+- The files report never worked on PostgreSQL. `finder` selected `f.*`, the user name fields
+  and `u.deleted` while grouping by `f.contenthash` alone, which PostgreSQL rejects, so every
+  search raised a database error. Records sharing a content hash are now listed separately,
+  as each is deleted separately, which also makes the total agree with the rows shown
+- Paging had no ordering, so a row could appear on two pages or on none. The report is now
+  ordered by size, largest first
+- A deprecated implicit float-to-int conversion in the batch timing wrote a PHP notice on
+  every batch under PHP 8.1 and above, and failed outright on Moodle 5.0
+
+### Added
+- The plugin's first test suite: PHPUnit coverage of the file search and of every clean-up
+  step except course modules, plus Behat coverage of both reports and their access checks
+- CI now runs PHPUnit, Behat, Mustache, Grunt, copy/paste and mess detection, and tests
+  against MySQL as well as PostgreSQL
+
 ## [2.3] - 2026-08-28
 
 ### Security
