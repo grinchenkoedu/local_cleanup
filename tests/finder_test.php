@@ -127,9 +127,15 @@ final class finder_test extends advanced_testcase {
         $wanted = $this->create_file('quarterly_report.txt', 'a ' . $this->token);
         $this->create_file('something_else.txt', 'b ' . $this->token);
 
-        $found = $this->find(['name_like' => $this->token . '_quarterly']);
-
-        $this->assertSame([$wanted->get_id()], $found);
+        $this->assertSame(
+            [$wanted->get_id()],
+            $this->find(['name_like' => $this->token . '_quarterly'])
+        );
+        $this->assertSame(
+            [$wanted->get_id()],
+            $this->find(['name_like' => $this->token . '_QUARTERLY']),
+            'The search is case-insensitive on every engine, not just the ones whose LIKE is.'
+        );
     }
 
     /**

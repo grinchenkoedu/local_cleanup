@@ -134,11 +134,16 @@ class finder {
         ];
 
         if (!empty($filter['name_like'])) {
-            $values['name_like'] = '%' . $filter['name_like'] . '%';
+            $values['name_like'] = '%' . $this->db->sql_like_escape($filter['name_like']) . '%';
         }
 
         if (!empty($filter['user_like'])) {
-            $values['user_like'] = '%' . $filter['user_like'] . '%';
+            // The owner clause tests three expressions, and a named parameter is bound once
+            // each, so the same value is supplied under three names.
+            $userlike = '%' . $this->db->sql_like_escape($filter['user_like']) . '%';
+            $values['user_like'] = $userlike;
+            $values['user_like_reversed'] = $userlike;
+            $values['user_like_author'] = $userlike;
         }
 
         if (!empty($filter['component'])) {
@@ -165,16 +170,20 @@ class finder {
         }
 
         if (!empty($filter['name_like'])) {
-            $where[] = 'f.filename LIKE :name_like';
+            // sql_like() rather than a bare LIKE: it is case-insensitive on every engine,
+            // where plain LIKE matches case-sensitively on PostgreSQL and not on MySQL.
+            $where[] = $this->db->sql_like('f.filename', ':name_like', false);
         }
 
         if (!empty($filter['user_like'])) {
             // Use database-agnostic concatenation via Moodle's sql_concat.
             $fullname1 = $this->db->sql_concat('u.firstname', "' '", 'u.lastname');
             $fullname2 = $this->db->sql_concat('u.lastname', "' '", 'u.firstname');
-            $where[] = "($fullname1 LIKE :user_like"
-                      . " OR $fullname2 LIKE :user_like"
-                      . " OR f.author LIKE :user_like)";
+            $where[] = '('
+                . $this->db->sql_like($fullname1, ':user_like', false)
+                . ' OR ' . $this->db->sql_like($fullname2, ':user_like_reversed', false)
+                . ' OR ' . $this->db->sql_like('f.author', ':user_like_author', false)
+                . ')';
         }
 
         if (!empty($filter['user_deleted'])) {
