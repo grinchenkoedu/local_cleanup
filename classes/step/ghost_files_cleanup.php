@@ -157,20 +157,36 @@ class ghost_files_cleanup implements step_interface {
 
         $ghostfiles->close();
 
-        foreach ([
-            $reclaimed => '%d file(s) referenced again since the scan were kept.',
-            $waiting => '%d file(s) have not yet been seen unlinked by two scans a grace period apart.',
-        ] as $count => $template) {
-            if ($count > 0) {
-                $note = sprintf($template, $count);
-                $result->note($note);
-                $output->write_line($note);
-            }
+        if ($reclaimed > 0) {
+            $this->note($result, $output, sprintf(
+                '%d file(s) referenced again since the scan were kept.',
+                $reclaimed
+            ));
+        }
+
+        if ($waiting > 0) {
+            $this->note($result, $output, sprintf(
+                '%d file(s) have not yet been seen unlinked by two scans a grace period apart.',
+                $waiting
+            ));
         }
 
         $output->write_line($result->summarise());
 
         return $result;
+    }
+
+    /**
+     * Record a note on the result and show it as it happens.
+     *
+     * @param step_result $result Result to note against
+     * @param output_interface $output Output handler
+     * @param string $note The note
+     * @return void
+     */
+    private function note(step_result $result, output_interface $output, string $note): void {
+        $result->note($note);
+        $output->write_line($note);
     }
 
     /**

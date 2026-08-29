@@ -154,7 +154,7 @@ class scan extends scheduled_task {
         $sizetotal = 0;
 
         foreach (array_chunk(array_keys($files), self::LOOKUP_CHUNK) as $hashes) {
-            list($insql, $params) = $this->db->get_in_or_equal($hashes, SQL_PARAMS_NAMED);
+            [$insql, $params] = $this->db->get_in_or_equal($hashes, SQL_PARAMS_NAMED);
             $referenced = $this->db->get_fieldset_select(
                 'files',
                 'DISTINCT contenthash',
