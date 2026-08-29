@@ -66,22 +66,35 @@ final class file_deleted_test extends advanced_testcase {
      * @return void
      */
     public function test_the_deleted_record_is_still_readable_from_the_event(): void {
+        global $DB;
+
         $this->resetAfterTest();
 
-        $snapshot = (object)[
-            'id' => 42,
+        $file = get_file_storage()->create_file_from_string([
+            'contextid' => context_system::instance()->id,
+            'component' => 'local_cleanup',
+            'filearea' => 'test',
+            'itemid' => 0,
+            'filepath' => '/',
             'filename' => 'essay.txt',
-            'component' => 'assignsubmission_file',
-            'contenthash' => str_repeat('a', 40),
-        ];
+        ], 'content to be destroyed');
 
-        $event = $this->create_event();
-        $event->add_record_snapshot('files', $snapshot);
+        $id = (int)$file->get_id();
+        $record = $DB->get_record('files', ['id' => $id], '*', MUST_EXIST);
 
+        $event = $this->create_event($id);
+        $event->add_record_snapshot('files', $record);
+
+        $file->delete();
+
+        $this->assertFalse(
+            $DB->record_exists('files', ['id' => $id]),
+            'The record must really be gone for this test to mean anything.'
+        );
         $this->assertSame(
             'essay.txt',
-            $event->get_record_snapshot('files', 42)->filename,
-            'An observer must be able to see what was removed.'
+            $event->get_record_snapshot('files', $id)->filename,
+            'An observer must still be able to see what was removed.'
         );
     }
 
@@ -108,12 +121,13 @@ final class file_deleted_test extends advanced_testcase {
     /**
      * Build a valid event.
      *
+     * @param int $objectid Id of the file the event describes
      * @return file_deleted The event, not yet triggered
      */
-    private function create_event(): file_deleted {
+    private function create_event(int $objectid = 42): file_deleted {
         return file_deleted::create([
             'context' => context_system::instance(),
-            'objectid' => 42,
+            'objectid' => $objectid,
             'other' => [
                 'filename' => 'essay.txt',
                 'filesize' => 1024,

@@ -31,12 +31,9 @@ use moodle_url;
  * @copyright  2026 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
- * @property-read array $other {
- *     @var string $filename Name of the deleted file.
- *     @var int $filesize Size in bytes.
- *     @var string $component Component that owned the file.
- *     @var string $contenthash Content hash, which may still back other records.
- * }
+ * The "other" array carries filename, filesize, component and contenthash. The content hash is
+ * included because it may still back other records: deleting this one does not necessarily free
+ * the bytes.
  */
 class file_deleted extends base {
     /**
