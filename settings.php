@@ -26,6 +26,12 @@
 
 defined('MOODLE_INTERNAL') || die;
 
+// settings.php is included while the admin tree is built, which happens during the very
+// upgrade that installs these files, before the class map necessarily knows about them.
+// Require the two classes referenced below rather than relying on the autoloader.
+require_once($CFG->dirroot . '/local/cleanup/classes/config.php');
+require_once($CFG->dirroot . '/local/cleanup/classes/finder.php');
+
 if ($hassiteconfig) {
     $ADMIN->add(
         'root',
