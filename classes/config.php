@@ -34,7 +34,6 @@ use local_cleanup\steps\LogsCleanup;
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class config {
-
     /**
      * The plugin these settings belong to.
      */
