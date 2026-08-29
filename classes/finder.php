@@ -170,8 +170,8 @@ class finder {
         }
 
         if (!empty($filter['name_like'])) {
-            // sql_like() rather than a bare LIKE: it is case-insensitive on every engine,
-            // where plain LIKE matches case-sensitively on PostgreSQL and not on MySQL.
+            // Use sql_like() rather than a bare LIKE: it is case-insensitive on every
+            // engine, where plain LIKE matches case-sensitively on PostgreSQL but not MySQL.
             $where[] = $this->db->sql_like('f.filename', ':name_like', false);
         }
 
