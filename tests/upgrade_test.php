@@ -30,7 +30,6 @@ use advanced_testcase;
  * @coversNothing
  */
 final class upgrade_test extends advanced_testcase {
-
     /**
      * Version of the plugin immediately before the settings moved.
      */
@@ -44,6 +43,9 @@ final class upgrade_test extends advanced_testcase {
     public static function setUpBeforeClass(): void {
         global $CFG;
 
+        // The upgrade script ends every step with upgrade_plugin_savepoint(), which lives in
+        // upgradelib - a file the test bootstrap does not load.
+        require_once($CFG->libdir . '/upgradelib.php');
         require_once($CFG->dirroot . '/local/cleanup/db/upgrade.php');
 
         parent::setUpBeforeClass();
