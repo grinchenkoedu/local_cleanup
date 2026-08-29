@@ -45,6 +45,7 @@ $string['coursemoduleslifetime'] = 'Course modules lifetime';
 $string['coursemoduleslifetimedesc'] = 'Number of days to keep orphaned course modules';
 $string['draftlifetime'] = 'Draft files lifetime';
 $string['draftlifetimedesc'] = 'Number of days to keep draft files';
+$string['event_file_deleted'] = 'File deleted';
 $string['failtoremove'] = 'Failed to remove file "{$a->name}"';
 $string['fileremoved'] = 'File "{$a->name}" removed, {$a->size}Mb cleaned';
 $string['files_total'] = 'Files total';

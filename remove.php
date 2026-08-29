@@ -23,6 +23,7 @@
  * @phpcs:ignore moodle.Commenting.ValidTags.Invalid
  * @var stdClass $CFG
  * @var stdClass $USER
+ * @var moodle_database $DB
  * @var moodle_page $PAGE
  * @var renderer_base $OUTPUT
  */
@@ -31,6 +32,7 @@ require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir . '/formslib.php');
 
 use core\notification;
+use local_cleanup\event\file_deleted;
 
 $PAGE->set_context(context_system::instance());
 $PAGE->set_url('/local/cleanup/remove.php');
@@ -65,6 +67,10 @@ $redirecturl = new moodle_url($redirect);
 $filename = $file->get_filename();
 $filesize = $file->get_filesize();
 
+// Captured before the deletion, because the event describes a record that will not exist by
+// the time anybody reads the log.
+$filerecord = $DB->get_record('files', ['id' => $id], '*', MUST_EXIST);
+
 if (optional_param('confirm', false, PARAM_BOOL)) {
     require_sesskey();
 
@@ -73,6 +79,19 @@ if (optional_param('confirm', false, PARAM_BOOL)) {
         // another record still references the same contenthash, and moved to the trash
         // directory otherwise, so core's trash clean-up task provides a recovery window.
         $file->delete();
+
+        $event = file_deleted::create([
+            'context' => context_system::instance(),
+            'objectid' => $id,
+            'other' => [
+                'filename' => $filename,
+                'filesize' => $filesize,
+                'component' => $filerecord->component,
+                'contenthash' => $filerecord->contenthash,
+            ],
+        ]);
+        $event->add_record_snapshot('files', $filerecord);
+        $event->trigger();
 
         $message = get_string(
             'fileremoved',
