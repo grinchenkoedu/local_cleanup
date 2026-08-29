@@ -114,7 +114,7 @@ class cleanup extends scheduled_task {
             $steps[] = new component_files_cleanup($DB, $components, config::component_files_lifetime_days());
         }
 
-        $steps[] = new ghost_files_cleanup($DB, $CFG->dataroot);
+        $steps[] = new ghost_files_cleanup($DB, $CFG->dataroot, config::ghost_grace_days());
         $steps[] = new files_checkout(
             $DB,
             get_file_storage(),

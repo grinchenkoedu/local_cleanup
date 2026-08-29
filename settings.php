@@ -135,6 +135,16 @@ if ($hassiteconfig) {
 
     $settings->add(
         new admin_setting_configtext(
+            'local_cleanup/ghostgracedays',
+            get_string('ghostgrace', 'local_cleanup'),
+            get_string('ghostgracedesc', 'local_cleanup'),
+            7,
+            PARAM_INT
+        )
+    );
+
+    $settings->add(
+        new admin_setting_configtext(
             'local_cleanup/logslifetimedays',
             get_string('logslifetime', 'local_cleanup'),
             get_string('logslifetimedesc', 'local_cleanup'),

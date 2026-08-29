@@ -44,6 +44,13 @@ class scan extends scheduled_task {
     private $dataroot;
 
     /**
+     * Timestamp for this run, so every row the scan touches agrees.
+     *
+     * @var int
+     */
+    private $now = 0;
+
+    /**
      * Constructor.
      */
     public function __construct() {
@@ -63,14 +70,33 @@ class scan extends scheduled_task {
     }
 
     /**
+     * How many content hashes to look up in one query.
+     */
+    const LOOKUP_CHUNK = 500;
+
+    /**
      * Execute the task.
      *
-     * Scans for unlinked files and reports the total size found.
+     * Walks the file pool and records anything the {files} table does not reference.
+     *
+     * @return void
      */
     public function execute() {
+        global $CFG;
+
+        if (!empty($CFG->alternative_file_system_class)) {
+            mtrace(
+                'This site stores files through ' . $CFG->alternative_file_system_class
+                . ', so there is no local file pool to walk. Nothing to do.'
+            );
+
+            return;
+        }
+
+        $this->now = time();
         $sizetotal = $this->scan_recursive('filedir');
 
-        mtrace(sprintf('Total found: %.3f GB', $sizetotal / 1024 / 1024 / 1024));
+        mtrace(sprintf('Total found: %s', display_size($sizetotal)));
     }
 
     /**
@@ -84,6 +110,7 @@ class scan extends scheduled_task {
         $sizetotal = 0;
         $absolute = $this->dataroot . DIRECTORY_SEPARATOR . $path;
         $list = scandir($absolute);
+        $files = [];
 
         foreach ($list as $index => $item) {
             if (preg_match('@^\.@', $item)) {
@@ -106,21 +133,41 @@ class scan extends scheduled_task {
                 continue;
             }
 
-            $record = $this->db->get_record('files', ['contenthash' => $item], 'id', IGNORE_MULTIPLE);
+            $files[$item] = $itempath;
+        }
 
-            if (empty($record)) {
-                $size = filesize($itempath);
+        return $sizetotal + $this->record_unreferenced($path, $files);
+    }
+
+    /**
+     * Record whichever of these files the {files} table does not reference.
+     *
+     * The hashes are looked up in chunks rather than one query per file. A pool directory holds
+     * a few hundred files and a large site has many thousands of directories, so the per-file
+     * query was the bulk of the scan's cost.
+     *
+     * @param string $path Directory path relative to dataroot
+     * @param array $files Map of content hash to absolute path
+     * @return int Total size of the unreferenced files found here
+     */
+    private function record_unreferenced(string $path, array $files): int {
+        $sizetotal = 0;
+
+        foreach (array_chunk(array_keys($files), self::LOOKUP_CHUNK) as $hashes) {
+            list($insql, $params) = $this->db->get_in_or_equal($hashes, SQL_PARAMS_NAMED);
+            $referenced = $this->db->get_fieldset_select(
+                'files',
+                'DISTINCT contenthash',
+                "contenthash $insql",
+                $params
+            );
+
+            foreach (array_diff($hashes, $referenced) as $hash) {
+                $itempath = $files[$hash];
+                $size = (int)filesize($itempath);
                 $sizetotal += $size;
-                $mime = mime_content_type($itempath);
 
-                $this->insert($path . DIRECTORY_SEPARATOR . $item, $mime, $size);
-
-                mtrace(
-                    sprintf(
-                        'Record NOT found for file "%s", added for removal.',
-                        $itempath
-                    )
-                );
+                $this->record($path . DIRECTORY_SEPARATOR . $hash, mime_content_type($itempath), $size);
             }
         }
 
@@ -128,30 +175,43 @@ class scan extends scheduled_task {
     }
 
     /**
-     * Insert or update a record in the local_cleanup_files table.
+     * Note that this file is still unreferenced.
+     *
+     * timeconfirmed is the first sighting and never moves; timescanned is the latest. The
+     * clean-up step needs both, because it only removes a file that two scans a grace period
+     * apart have each found unreferenced.
      *
      * @param string $path File path relative to dataroot
      * @param string $mime MIME type of the file
      * @param int $size Size of the file in bytes
+     * @return void
      */
-    private function insert($path, $mime, $size) {
+    private function record(string $path, string $mime, int $size): void {
         $existing = $this->db->get_record('local_cleanup_files', ['path' => $path]);
 
         if (!empty($existing)) {
             $existing->mime = $mime;
             $existing->size = $size;
+            $existing->timescanned = $this->now;
+
+            if (empty($existing->timeconfirmed)) {
+                // Recorded before this bookkeeping existed; treat now as the first sighting.
+                $existing->timeconfirmed = $this->now;
+            }
 
             $this->db->update_record('local_cleanup_files', $existing);
 
             return;
         }
 
-        $data = [
+        $this->db->insert_record('local_cleanup_files', (object)[
             'path' => $path,
             'mime' => $mime,
             'size' => $size,
-        ];
+            'timeconfirmed' => $this->now,
+            'timescanned' => $this->now,
+        ]);
 
-        $this->db->insert_record('local_cleanup_files', (object)$data);
+        mtrace(sprintf('No record for "%s"; noted as unlinked.', $path));
     }
 }

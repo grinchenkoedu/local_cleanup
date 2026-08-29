@@ -10,10 +10,15 @@
         <FIELD NAME="path" TYPE="char" LENGTH="255" NOTNULL="true" COMMENT="File path"/>
         <FIELD NAME="mime" TYPE="char" LENGTH="255" NOTNULL="true" COMMENT="MIME type"/>
         <FIELD NAME="size" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="File size in bytes"/>
+        <FIELD NAME="timeconfirmed" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="When a scan first found this file unreferenced"/>
+        <FIELD NAME="timescanned" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="When a scan last found this file unreferenced"/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
       </KEYS>
+      <INDEXES>
+        <INDEX NAME="path" UNIQUE="false" FIELDS="path" COMMENT="The scan looks rows up by path on every file it finds"/>
+      </INDEXES>
     </TABLE>
   </TABLES>
 </XMLDB>

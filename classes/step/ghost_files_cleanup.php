@@ -45,14 +45,28 @@ class ghost_files_cleanup implements step_interface {
     private $dataroot;
 
     /**
+     * Default days between the two scans that must agree before a file is removed.
+     */
+    const DEFAULT_GRACE_DAYS = 7;
+
+    /**
+     * Seconds that must separate the first and latest sighting.
+     *
+     * @var int
+     */
+    private $grace;
+
+    /**
      * Constructor.
      *
      * @param moodle_database $db Database connection
      * @param string $dataroot Path to Moodle data directory
+     * @param int $gracedays Days between the two scans that must agree
      */
-    public function __construct(moodle_database $db, string $dataroot) {
+    public function __construct(moodle_database $db, string $dataroot, int $gracedays = self::DEFAULT_GRACE_DAYS) {
         $this->db = $db;
         $this->dataroot = $dataroot;
+        $this->grace = $gracedays * DAYSECS;
     }
 
     /**
@@ -95,8 +109,14 @@ class ghost_files_cleanup implements step_interface {
         $result = new step_result();
         $output->write($delete ? 'Deleting unlinked files... ' : 'Checking unlinked files... ');
 
-        $ghostfiles = $this->db->get_recordset('local_cleanup_files', [], '', 'id, path, size');
+        $ghostfiles = $this->db->get_recordset(
+            'local_cleanup_files',
+            [],
+            '',
+            'id, path, size, timeconfirmed, timescanned'
+        );
         $reclaimed = 0;
+        $waiting = 0;
 
         foreach ($ghostfiles as $item) {
             // The scan that recorded this file runs on its own schedule, so this list can be
@@ -112,15 +132,21 @@ class ghost_files_cleanup implements step_interface {
                 continue;
             }
 
+            // One sighting is not enough. Two scans a grace period apart have to agree, so
+            // that content appearing between them is never destroyed on a single observation.
+            if ((int)$item->timescanned - (int)$item->timeconfirmed < $this->grace) {
+                $waiting++;
+
+                continue;
+            }
+
             $result->add(1, (int)$item->size);
 
             if (!$delete) {
                 continue;
             }
 
-            $path = $this->dataroot . DIRECTORY_SEPARATOR . $item->path;
-
-            if (file_exists($path) && unlink($path)) {
+            if ($this->move_to_trash($item->path)) {
                 $output->write('.');
             } else {
                 $output->write('E');
@@ -131,13 +157,51 @@ class ghost_files_cleanup implements step_interface {
 
         $ghostfiles->close();
 
-        if ($reclaimed > 0) {
-            $result->note(sprintf('%d file(s) referenced again since the scan were kept.', $reclaimed));
-            $output->write_line(sprintf('%d file(s) referenced again since the scan were kept.', $reclaimed));
+        foreach ([
+            $reclaimed => '%d file(s) referenced again since the scan were kept.',
+            $waiting => '%d file(s) have not yet been seen unlinked by two scans a grace period apart.',
+        ] as $count => $template) {
+            if ($count > 0) {
+                $note = sprintf($template, $count);
+                $result->note($note);
+                $output->write_line($note);
+            }
         }
 
         $output->write_line($result->summarise());
 
         return $result;
+    }
+
+    /**
+     * Move a pool file into the trash directory rather than unlinking it.
+     *
+     * Moodle's own trash clean-up task empties that directory later, which turns an
+     * irreversible delete into one an administrator has a window to undo.
+     *
+     * @param string $relativepath Path of the file relative to dataroot
+     * @return bool True when the file was moved, or was already gone
+     */
+    private function move_to_trash(string $relativepath): bool {
+        $source = $this->dataroot . DIRECTORY_SEPARATOR . $relativepath;
+
+        if (!file_exists($source)) {
+            return true;
+        }
+
+        $hash = basename($relativepath);
+        $target = $this->dataroot . DIRECTORY_SEPARATOR . 'trashdir'
+            . DIRECTORY_SEPARATOR . substr($hash, 0, 2)
+            . DIRECTORY_SEPARATOR . substr($hash, 2, 2)
+            . DIRECTORY_SEPARATOR . $hash;
+
+        if (file_exists($target)) {
+            // Already waiting in the trash; the pool copy is the redundant one.
+            return unlink($source);
+        }
+
+        check_dir_exists(dirname($target));
+
+        return rename($source, $target);
     }
 }

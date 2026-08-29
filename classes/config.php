@@ -19,6 +19,7 @@ namespace local_cleanup;
 use local_cleanup\step\component_files_cleanup;
 use local_cleanup\step\course_modules_cleanup;
 use local_cleanup\step\files_checkout;
+use local_cleanup\step\ghost_files_cleanup;
 use local_cleanup\step\grades_cleanup;
 use local_cleanup\step\logs_cleanup;
 
@@ -134,6 +135,15 @@ class config {
      */
     public static function grades_lifetime_days(): int {
         return self::days('gradeslifetimedays', grades_cleanup::DEFAULT_LIFETIME_DAYS);
+    }
+
+    /**
+     * Days that must pass between the two scans that agree a file is unlinked.
+     *
+     * @return int Days
+     */
+    public static function ghost_grace_days(): int {
+        return self::days('ghostgracedays', ghost_files_cleanup::DEFAULT_GRACE_DAYS);
     }
 
     /**
