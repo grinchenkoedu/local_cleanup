@@ -151,7 +151,10 @@ final class ghost_files_cleanup_test extends advanced_testcase {
         $output = $this->run_cleanup();
 
         $this->assertSame(0, $DB->count_records('local_cleanup_files'));
-        $this->assertTrue($output->contains('Done!'));
+        $this->assertTrue(
+            $output->contains('nothing found'),
+            'An empty scan table should be reported as nothing found.'
+        );
     }
 
     /**

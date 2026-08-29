@@ -81,15 +81,18 @@ class component_files_cleanup extends base {
         $candidates = [];
 
         foreach ($this->components as $component) {
+            // Each candidate set is run as its own query, so the placeholder names are local
+            // to it and need no suffix. Component names are long enough that suffixing them
+            // breaks Moodle's 30 character limit anyway.
             $candidates[] = [
                 'table' => 'files',
-                'sql' => "SELECT f.id
+                'sql' => 'SELECT f.id
                             FROM {files} f
-                           WHERE f.component = :component_{$component}
-                             AND f.timecreated < :cutoffdate_{$component}",
+                           WHERE f.component = :component
+                             AND f.timecreated < :cutoffdate',
                 'params' => [
-                    "component_{$component}" => $component,
-                    "cutoffdate_{$component}" => $cutoffdate,
+                    'component' => $component,
+                    'cutoffdate' => $cutoffdate,
                 ],
                 'message' => sprintf('%s files older than %d days', $component, $this->daystokeep),
             ];
