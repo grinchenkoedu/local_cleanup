@@ -47,8 +47,8 @@ final class cleanup_test extends advanced_testcase {
 
         $this->resetAfterTest();
 
-        set_config('cleanup_run_autoremove', 0);
-        set_config('cleanup_backup_timeout_days', self::TIMEOUT_DAYS);
+        set_config('autoremove', 0, 'local_cleanup');
+        set_config('backuplifetimedays', self::TIMEOUT_DAYS, 'local_cleanup');
 
         $file = $this->create_outdated_backup();
         $before = $DB->count_records('files');
@@ -79,8 +79,8 @@ final class cleanup_test extends advanced_testcase {
 
         $this->resetAfterTest();
 
-        set_config('cleanup_run_autoremove', 1);
-        set_config('cleanup_backup_timeout_days', self::TIMEOUT_DAYS);
+        set_config('autoremove', 1, 'local_cleanup');
+        set_config('backuplifetimedays', self::TIMEOUT_DAYS, 'local_cleanup');
 
         $file = $this->create_outdated_backup();
 
@@ -89,6 +89,59 @@ final class cleanup_test extends advanced_testcase {
         $this->assertFalse(
             $DB->record_exists('files', ['id' => $file->get_id()]),
             'An outdated backup should be removed once auto-remove is enabled.'
+        );
+    }
+
+    /**
+     * With automatic removal on but no component chosen, component files are left alone.
+     *
+     * The component list used to be hardcoded, so enabling automatic removal deleted student
+     * submissions nobody had opted in to losing.
+     *
+     * @return void
+     */
+    public function test_no_component_files_are_removed_until_a_component_is_chosen(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        set_config('autoremove', 1, 'local_cleanup');
+        set_config('componentfiles', '', 'local_cleanup');
+        set_config('componentfileslifetimedays', 180, 'local_cleanup');
+
+        $submission = $this->create_outdated_file('essay.txt', 'assignsubmission_file');
+
+        $this->execute_task();
+
+        $this->assertTrue(
+            $DB->record_exists('files', ['id' => $submission->get_id()]),
+            'No component may lose files until an administrator names it.'
+        );
+    }
+
+    /**
+     * A component the administrator did choose does lose its outdated files.
+     *
+     * The control for the test above: without it, that one would pass if the step never ran.
+     *
+     * @return void
+     */
+    public function test_a_chosen_component_is_cleaned_up(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        set_config('autoremove', 1, 'local_cleanup');
+        set_config('componentfiles', 'assignsubmission_file', 'local_cleanup');
+        set_config('componentfileslifetimedays', 180, 'local_cleanup');
+
+        $submission = $this->create_outdated_file('essay.txt', 'assignsubmission_file');
+
+        $this->execute_task();
+
+        $this->assertFalse(
+            $DB->record_exists('files', ['id' => $submission->get_id()]),
+            'A component that was ticked should lose its outdated files.'
         );
     }
 
@@ -107,6 +160,33 @@ final class cleanup_test extends advanced_testcase {
         } finally {
             ob_end_clean();
         }
+    }
+
+    /**
+     * Create a file old enough to be outdated, owned by the given component.
+     *
+     * @param string $filename Name of the file
+     * @param string $component Owning component
+     * @return stored_file The created file
+     */
+    private function create_outdated_file(string $filename, string $component): stored_file {
+        $timecreated = time() - 400 * DAYSECS;
+
+        $filerecord = [
+            'contextid' => context_system::instance()->id,
+            'component' => $component,
+            'filearea' => 'test',
+            'itemid' => 1,
+            'filepath' => '/',
+            'filename' => $filename,
+            'timecreated' => $timecreated,
+            'timemodified' => $timecreated,
+        ];
+
+        return get_file_storage()->create_file_from_string(
+            $filerecord,
+            'outdated content ' . random_string(32)
+        );
     }
 
     /**
