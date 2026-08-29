@@ -218,6 +218,8 @@ class ghost_files_cleanup implements step_interface {
 
         check_dir_exists(dirname($target));
 
+        // rename() is atomic only within one filesystem. Both directories live under
+        // dataroot, so this holds today; it would not if filedir were ever mounted separately.
         return rename($source, $target);
     }
 }
