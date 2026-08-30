@@ -22,14 +22,15 @@
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @var moodle_page $PAGE
  * @var moodle_database $DB
- * @var stdClass $USER
- * @var stdClass $CFG
  * @var renderer_base $OUTPUT
  */
 
 require_once(__DIR__ . '/../../config.php');
 
 use core\task\manager as task_manager;
+use local_cleanup\config;
+use local_cleanup\output\summary;
+use local_cleanup\table\ghost_table;
 use local_cleanup\task\cleanup;
 
 $PAGE->set_context(context_system::instance());
@@ -41,77 +42,40 @@ $PAGE->set_pagelayout('admin');
 require_login();
 require_capability('local/cleanup:view', context_system::instance());
 
-$task = task_manager::get_scheduled_task(cleanup::class);
-$page = optional_param('page', 0, PARAM_INT);
-$limit = 250;
-
-$items = $DB->get_recordset('local_cleanup_files', [], 'size DESC', '*', $page * $limit, $limit);
-$totalitems = $DB->count_records('local_cleanup_files');
-$totalsize = $DB->get_field('local_cleanup_files', 'SUM(size)', []) ?: 0;
-
-$table = new html_table();
-$table->head = [
-    get_string('file'),
-    'MIME',
-    get_string('size'),
-    '',
-];
-
-while ($items->valid()) {
-    $item = $items->current();
-
-    $actions = [
-        html_writer::link(
-            new moodle_url('/local/cleanup/download.php', ['path' => $item->path]),
-            $OUTPUT->pix_icon('i/down', get_string('download'))
-        ),
-    ];
-
-    // Note: html_writer::table() does not escape cell contents; $item->mime in particular
-    // comes from mime_content_type() on a user-supplied file.
-    $table->data[] = [
-        s($item->path),
-        s($item->mime),
-        sprintf(
-            '%.1f %s',
-            $item->size / pow(1024, 2),
-            get_string('sizemb')
-        ),
-        implode(' ', $actions),
-    ];
-
-    $items->next();
-}
-
-$items->close();
-
-$pagination = $OUTPUT->paging_bar($totalitems, $page, $limit, $PAGE->url);
-
-echo $OUTPUT->header();
-
-echo $OUTPUT->box(
-    html_writer::tag(
-        'p',
-        html_writer::tag(
-            'b',
-            get_string(
-                'ghosttotalheader',
-                'local_cleanup',
-                [
-                    'files' => $totalitems,
-                    'size' => sprintf('%.3f', $totalsize / pow(1024, 3)),
-                    'cleanup_date' => date(DATE_ISO8601, $task->get_next_run_time()),
-                ]
-            )
-        )
-    )
+$table = new ghost_table('local_cleanup_ghost_report', $PAGE->url, config::ghost_grace_days());
+$table->is_downloading(
+    optional_param('download', '', PARAM_ALPHA),
+    'local_cleanup_unlinked',
+    get_string('ghostfiles', 'local_cleanup')
 );
 
-if (count($table->data) !== 0) {
-    echo html_writer::table($table);
-} else {
-    echo $OUTPUT->notification(get_string('nothingtoshow', 'local_cleanup'), 'notifysuccess');
+if (!$table->is_downloading()) {
+    // The task lookup returns false when no task_scheduled row matches, which happens after
+    // a partial upgrade or if somebody deletes the task in Site administration. The totals are
+    // still worth showing, so only the date goes missing.
+    $task = task_manager::get_scheduled_task(cleanup::class);
+    $nextrun = $task
+        ? userdate($task->get_next_run_time(), get_string('strftimedatetimeshort', 'langconfig'))
+        : get_string('cleanupnotscheduled', 'local_cleanup');
+
+    echo $OUTPUT->header();
+
+    $summary = (new summary())
+        ->add(
+            get_string('filesfound', 'local_cleanup'),
+            number_format($DB->count_records('local_cleanup_files'))
+        )
+        ->add(
+            get_string('totalsize', 'local_cleanup'),
+            display_size((int)($DB->get_field('local_cleanup_files', 'SUM(size)', []) ?: 0))
+        )
+        ->set_note(get_string('nextcleanup', 'local_cleanup', $nextrun));
+
+    echo $PAGE->get_renderer('local_cleanup')->render($summary);
 }
 
-echo $OUTPUT->box($pagination, 'text-center');
-echo $OUTPUT->footer();
+$table->out(config::items_per_page(), true);
+
+if (!$table->is_downloading()) {
+    echo $OUTPUT->footer();
+}

@@ -66,7 +66,7 @@ class scan extends scheduled_task {
      * @return string The name of the task
      */
     public function get_name() {
-        return 'Scan for unlinked files';
+        return get_string('taskscan', 'local_cleanup');
     }
 
     /**

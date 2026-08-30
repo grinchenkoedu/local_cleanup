@@ -22,7 +22,6 @@
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @var moodle_page $PAGE
  * @var moodle_database $DB
- * @var stdClass $USER
  * @var stdClass $CFG
  * @var renderer_base $OUTPUT
  */
@@ -33,6 +32,7 @@ require_once($CFG->libdir . '/formslib.php');
 use local_cleanup\config;
 use local_cleanup\finder;
 use local_cleanup\form\filter_form;
+use local_cleanup\table\files_table;
 
 $PAGE->set_context(context_system::instance());
 $PAGE->set_url('/local/cleanup/files.php');
@@ -43,129 +43,55 @@ $PAGE->set_pagelayout('admin');
 require_login();
 require_capability('local/cleanup:view', context_system::instance());
 
-$page = optional_param('page', 0, PARAM_INT);
-$limit = config::items_per_page();
-
-$filter = [
-    'filesize' => optional_param('filesize', 50, PARAM_INT),
-    'name_like' => optional_param('name_like', '', PARAM_TEXT),
-    'user_like' => optional_param('user_like', '', PARAM_TEXT),
-    'component' => optional_param('component', '', PARAM_TEXT),
-    'user_deleted' => optional_param('user_deleted', '', PARAM_TEXT),
+$defaults = [
+    'filesize' => 50,
+    'name_like' => '',
+    'user_like' => '',
+    'component' => '',
+    'user_deleted' => 0,
 ];
 
-$filterform = new filter_form(null, $filter);
+$filter = [
+    'filesize' => optional_param('filesize', $defaults['filesize'], PARAM_INT),
+    'name_like' => optional_param('name_like', $defaults['name_like'], PARAM_TEXT),
+    'user_like' => optional_param('user_like', $defaults['user_like'], PARAM_TEXT),
+    'component' => optional_param('component', $defaults['component'], PARAM_COMPONENT),
+    'user_deleted' => optional_param('user_deleted', $defaults['user_deleted'], PARAM_BOOL),
+];
+
+$finder = new finder($DB);
+$filterform = new filter_form(null, $filter + ['components' => $finder->get_components()]);
 
 if ($filterform->is_cancelled()) {
     redirect($PAGE->url);
 }
 
-$redirecturl = new moodle_url($PAGE->url, array_merge($filter, ['page' => $page]));
+// The filter travels in the URL so that sorting, paging and the delete round trip all keep it.
+// Only what differs from the defaults goes along: a size of 0 means "any" and has to survive,
+// so this cannot simply drop falsy values.
+$baseurl = new moodle_url($PAGE->url, array_diff_assoc($filter, $defaults));
 
-$candelete = has_capability('local/cleanup:deletefiles', context_system::instance());
-
-$finder = new finder($DB);
-$items = $finder->find($limit, $page * $limit, $filter);
-$totalitems = $finder->count($filter);
-$maxitems = pow(10, 3) * ($page + 1);
-
-$table = new html_table();
-$table->head = [
-    get_string('filename', 'backup'),
-    get_string('component', 'cache'),
-    get_string('size'),
-    get_string('user', 'admin'),
-    get_string('date'),
-    '',
-];
-
-$table->size = ['30%', '15%', '10%', '30%', '15%', '1%'];
-
-while ($items->valid()) {
-    $item = $items->current();
-
-    $actions = [
-        html_writer::link(
-            new moodle_url('/local/cleanup/download.php', ['id' => $item->id]),
-            $OUTPUT->pix_icon('i/down', get_string('download'))
-        ),
-    ];
-
-    if (
-        preg_match('/^mod_/', $item->component)
-        || ($item->component === 'backup' && $item->filearea === 'course')
-    ) {
-        array_unshift(
-            $actions,
-            html_writer::link(
-                new moodle_url('/local/cleanup/open.php', ['id' => $item->id]),
-                $OUTPUT->pix_icon('i/preview', get_string('view')),
-                [
-                    'target' => '_blank',
-                ]
-            )
-        );
-    }
-
-    if ($candelete) {
-        $actions[] = html_writer::link(
-            new moodle_url('/local/cleanup/remove.php', ['id' => $item->id, 'redirect' => $redirecturl]),
-            $OUTPUT->pix_icon('t/delete', get_string('delete'))
-        );
-    }
-
-    // Note: html_writer does not escape link text or table cells, so every database value
-    // below is passed through s() explicitly.
-    if (!$item->user_deleted) {
-        $user = html_writer::link(
-            new moodle_url('/user/profile.php', ['id' => $item->userid]),
-            s(fullname($item)),
-            [
-                'target' => '_blank',
-            ]
-        );
-    } else {
-        $user = html_writer::tag('del', s(fullname($item)));
-    }
-
-    $table->data[] = [
-        s($item->filename),
-        s(sprintf('%s, %s', $item->component, $item->filearea)),
-        sprintf(
-            '%.1f %s',
-            $item->filesize / pow(1024, 2),
-            get_string('sizemb')
-        ),
-        $user,
-        date('Y-m-d H:i', $item->timecreated),
-        implode(' ', $actions),
-    ];
-
-    $items->next();
-}
-
-$items->close();
-
-$pagination = $OUTPUT->paging_bar(
-    $totalitems > $maxitems ? $maxitems : $totalitems,
-    $page,
-    $limit,
-    new moodle_url($PAGE->url, $filter)
+$table = new files_table(
+    'local_cleanup_files_report',
+    $finder,
+    $filter,
+    $baseurl,
+    has_capability('local/cleanup:deletefiles', context_system::instance())
+);
+$table->is_downloading(
+    optional_param('download', '', PARAM_ALPHA),
+    'local_cleanup_files',
+    get_string('files')
 );
 
-echo $OUTPUT->header();
+if (!$table->is_downloading()) {
+    echo $OUTPUT->header();
 
-$filterform->display();
-
-if (count($table->data) !== 0) {
-    echo html_writer::tag(
-        'p',
-        get_string('files_total', 'local_cleanup') . ': ' . $totalitems
-    );
-    echo html_writer::table($table);
-} else {
-    echo $OUTPUT->notification(get_string('nothingtoshow', 'local_cleanup'));
+    $filterform->display();
 }
 
-echo $OUTPUT->box($pagination, 'text-center');
-echo $OUTPUT->footer();
+$table->out(config::items_per_page(), true);
+
+if (!$table->is_downloading()) {
+    echo $OUTPUT->footer();
+}

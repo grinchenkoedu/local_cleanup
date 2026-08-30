@@ -35,7 +35,7 @@ class cleanup extends scheduled_task {
      * @return string The name of the task
      */
     public function get_name() {
-        return 'Database and disk clean-up';
+        return get_string('taskcleanup', 'local_cleanup');
     }
 
     /**
