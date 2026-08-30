@@ -16,6 +16,7 @@
 
 namespace local_cleanup;
 
+use local_cleanup\output\output_interface;
 use local_cleanup\step\component_files_cleanup;
 use local_cleanup\step\course_modules_cleanup;
 use local_cleanup\step\files_checkout;
@@ -71,11 +72,11 @@ class step_factory {
     /**
      * Run every step, reporting or removing, and total up what happened.
      *
-     * @param output\output_interface $output Output handler for progress
+     * @param output_interface $output Output handler for progress
      * @param bool $remove Whether to remove anything, or only count it
      * @return step_result The totals across every step
      */
-    public static function run_all(output\output_interface $output, bool $remove): step_result {
+    public static function run_all(output_interface $output, bool $remove): step_result {
         $total = new step_result();
 
         foreach (self::create_all() as $step) {
