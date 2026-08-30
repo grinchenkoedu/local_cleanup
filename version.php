@@ -33,4 +33,4 @@ $plugin->maturity = MATURITY_STABLE;
 $plugin->release = '3.0';
 $plugin->requires = 2022041200; // Moodle 4.1 (LTS).
 $plugin->supported = [401, 500]; // Tested against 4.1, 4.5 and 5.0.
-$plugin->phpversion = '7.4.0'; // The floor Moodle 4.1 itself sets; CI runs 8.1, 8.3 and 8.4.
+$plugin->phpversion = '7.4.0'; // The floor Moodle 4.1 sets; CI syntax-checks 7.4, tests 8.1+.

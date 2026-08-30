@@ -7,6 +7,36 @@ on:
     branches: [ master, main, develop ]
 
 jobs:
+
+  # The plugin declares $plugin->phpversion = '7.4.0', which is the floor Moodle 4.1 sets and
+  # what some sites running this actually have. moodle-plugin-ci v4 needs PHP 8, so the full
+  # suite cannot run on 7.4 - but a syntax check can, and it catches the realistic mistake:
+  # 8.x-only syntax landing in a plugin that claims to support 7.4.
+  php74-syntax:
+    name: PHP 7.4 syntax (declared minimum)
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up PHP 7.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+
+      - name: Lint every file
+        run: find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 -P4 php -l
+
+      - name: Reject PHP 8 only functions
+        run: |
+          # php -l cannot see these: they parse on 7.4 and fatal at runtime.
+          if grep -rnE '\b(str_contains|str_starts_with|str_ends_with|get_debug_type|array_is_list|preg_last_error_msg|enum_exists)\s*\(' \
+               --include='*.php' . ; then
+            echo "::error::PHP 8 only function used, but the plugin declares 7.4 support."
+            exit 1
+          fi
+          echo "None found."
   moodle-plugin-ci:
     name: Moodle Plugin CI
     runs-on: ubuntu-22.04
