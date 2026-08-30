@@ -43,12 +43,20 @@ $PAGE->set_pagelayout('admin');
 require_login();
 require_capability('local/cleanup:view', context_system::instance());
 
+$defaults = [
+    'filesize' => 50,
+    'name_like' => '',
+    'user_like' => '',
+    'component' => '',
+    'user_deleted' => 0,
+];
+
 $filter = [
-    'filesize' => optional_param('filesize', 50, PARAM_INT),
-    'name_like' => optional_param('name_like', '', PARAM_TEXT),
-    'user_like' => optional_param('user_like', '', PARAM_TEXT),
-    'component' => optional_param('component', '', PARAM_COMPONENT),
-    'user_deleted' => optional_param('user_deleted', 0, PARAM_BOOL),
+    'filesize' => optional_param('filesize', $defaults['filesize'], PARAM_INT),
+    'name_like' => optional_param('name_like', $defaults['name_like'], PARAM_TEXT),
+    'user_like' => optional_param('user_like', $defaults['user_like'], PARAM_TEXT),
+    'component' => optional_param('component', $defaults['component'], PARAM_COMPONENT),
+    'user_deleted' => optional_param('user_deleted', $defaults['user_deleted'], PARAM_BOOL),
 ];
 
 $finder = new finder($DB);
@@ -59,9 +67,9 @@ if ($filterform->is_cancelled()) {
 }
 
 // The filter travels in the URL so that sorting, paging and the delete round trip all keep it.
-$baseurl = new moodle_url($PAGE->url, array_filter($filter, function ($value) {
-    return $value !== '' && $value !== null;
-}));
+// Only what differs from the defaults goes along: a size of 0 means "any" and has to survive,
+// so this cannot simply drop falsy values.
+$baseurl = new moodle_url($PAGE->url, array_diff_assoc($filter, $defaults));
 
 $table = new files_table(
     'local_cleanup_files_report',
