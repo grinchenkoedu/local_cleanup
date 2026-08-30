@@ -242,8 +242,9 @@ class course_modules_cleanup implements step_interface {
     /**
      * Manually clean up course module data when standard deletion fails.
      *
-     * This is based on the clean-up part of the course_delete_module function in Moodle 4.1.
-     * It removes all associated data for a course module when the standard deletion process fails.
+     * This is based on the clean-up part of the course_delete_module function in Moodle 4.1,
+     * and it starts where core starts: with the activity itself. It removes all associated data
+     * for a course module when the standard deletion process fails.
      *
      * @param object $cm Course module object
      * @return void
@@ -252,6 +253,8 @@ class course_modules_cleanup implements step_interface {
     private function clean_up_course_module_data($cm): void {
         $modcontext = \context_module::instance($cm->id);
         $modulename = $this->db->get_field('modules', 'name', ['id' => $cm->module], MUST_EXIST);
+
+        $this->delete_module_instance($cm, $modulename);
 
         question_delete_activity($cm);
 
@@ -333,5 +336,87 @@ class course_modules_cleanup implements step_interface {
         $event->trigger();
         \course_modinfo::purge_course_module_cache($cm->course, $cm->id);
         rebuild_course_cache($cm->course, false, true);
+    }
+
+    /**
+     * Remove the activity itself, before anything it is found by is taken away.
+     *
+     * Core calls the module's own delete_instance() first and deletes the course_modules row
+     * last. Leaving that call out strands the activity's own row: unreachable from the site,
+     * and still picked up by that module's cron, which then fails site-wide on a record it
+     * cannot resolve. It runs here, at the top of the clean-up, because delete_instance() finds
+     * the activity through the course module row and the module context, and both are gone by
+     * the end of it.
+     *
+     * @param object $cm Course module object
+     * @param string $modulename Module name, such as "assign"
+     * @return void
+     * @throws \moodle_exception When the activity cannot be removed. The caller then leaves the
+     *                           course module alone, which is recoverable; a stranded activity
+     *                           is not.
+     * @see course_delete_module
+     */
+    private function delete_module_instance($cm, string $modulename): void {
+        global $CFG;
+
+        // A module whose plugin has been uninstalled has no table left to strand a row in.
+        if (!$this->db->get_manager()->table_exists($modulename)) {
+            return;
+        }
+
+        // Re-runs are expected here: course_delete_module() can fail at a later stage, after its
+        // own delete_instance() call has already succeeded.
+        if (!$this->db->record_exists($modulename, ['id' => $cm->instance])) {
+            return;
+        }
+
+        // With the course gone, core cannot remove the activity at all: every module's
+        // delete_instance() reaches it through the course module and the course, and loading
+        // either one now fails. Take the row out directly, with the calendar entries pointing
+        // at it, rather than leave it stranded. The module's own child rows stay behind; they
+        // reference nothing and break nothing, and guessing at their table names would be
+        // worse than leaving them.
+        if (!$this->db->record_exists('course', ['id' => $cm->course])) {
+            $this->db->delete_records('event', ['modulename' => $modulename, 'instance' => $cm->instance]);
+            $this->db->delete_records($modulename, ['id' => $cm->instance]);
+
+            return;
+        }
+
+        $modlib = $CFG->dirroot . '/mod/' . $modulename . '/lib.php';
+
+        if (!file_exists($modlib)) {
+            throw new \moodle_exception(
+                'cannotdeletemodulemissinglib',
+                '',
+                '',
+                null,
+                "Cannot delete this module as the file mod/$modulename/lib.php is missing."
+            );
+        }
+
+        require_once($modlib);
+
+        $deleteinstancefunction = $modulename . '_delete_instance';
+
+        if (!function_exists($deleteinstancefunction)) {
+            throw new \moodle_exception(
+                'cannotdeletemodulemissingfunc',
+                '',
+                '',
+                null,
+                "Cannot delete this module as {$modulename}_delete_instance is missing in mod/$modulename/lib.php."
+            );
+        }
+
+        if (!$deleteinstancefunction($cm->instance)) {
+            throw new \moodle_exception(
+                'cannotdeletemoduleinstance',
+                '',
+                '',
+                null,
+                "Cannot delete the module $modulename (instance)."
+            );
+        }
     }
 }
