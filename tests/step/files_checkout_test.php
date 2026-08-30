@@ -192,6 +192,37 @@ final class files_checkout_test extends advanced_testcase {
     }
 
     /**
+     * A record whose pool content has vanished is left alone.
+     *
+     * This step used to sweep the whole table for those and delete them. That is an integrity
+     * check rather than a lifetime one, it cannot be expressed in the candidate query, and it
+     * was the only reason to open every file on the site. Pinned here so the narrowing is
+     * deliberate rather than something a later change quietly undoes either way.
+     *
+     * @return void
+     */
+    public function test_a_record_with_missing_content_is_left_alone(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $file = $this->create_backup('gone.txt', 'vanishing ' . random_string(32), $this->outdated());
+        $handle = get_file_storage()->get_file_system()->get_content_file_handle($file);
+        $uri = stream_get_meta_data($handle)['uri'];
+        fclose($handle);
+
+        // Take the content out from under the record, as a botched manual clean-up would.
+        unlink($uri);
+
+        $this->run_checkout();
+
+        $this->assertTrue(
+            $DB->record_exists('files', ['id' => $file->get_id()]),
+            'A record with no content behind it is broken, but removing it is not this step\'s job.'
+        );
+    }
+
+    /**
      * Run the step under test.
      *
      * @return spy_output The captured output
