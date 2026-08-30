@@ -91,6 +91,13 @@ class module_instances {
     private $instanceid;
 
     /**
+     * Most activities to remove in one run, or zero for no ceiling.
+     *
+     * @var int
+     */
+    private $limit;
+
+    /**
      * Constructor.
      *
      * @param moodle_database $db Database connection
@@ -98,23 +105,29 @@ class module_instances {
      * @param string[] $modules Module names to look at, empty for every installed module
      * @param int|null $courseid Course to restrict the search to, null for all
      * @param int|null $instanceid Single activity to act on, null for all
+     * @param int $limit Most activities to remove in one run, zero for no ceiling
      */
     public function __construct(
         moodle_database $db,
         int $daystokeep = self::DEFAULT_GRACE_DAYS,
         array $modules = [],
         ?int $courseid = null,
-        ?int $instanceid = null
+        ?int $instanceid = null,
+        int $limit = 0
     ) {
         $this->db = $db;
         $this->daystokeep = $daystokeep;
         $this->modules = $modules;
         $this->courseid = $courseid;
         $this->instanceid = $instanceid;
+        $this->limit = $limit;
     }
 
     /**
      * Count and name what would be removed, touching nothing.
+     *
+     * A ceiling on the run does not apply here: the point of the report is the whole number,
+     * so an operator can see how many runs the backlog will take.
      *
      * @param output_interface $output Output handler for progress
      * @return step_result What would be removed
@@ -192,11 +205,19 @@ class module_instances {
         $result = new step_result();
 
         foreach ($this->get_modules($output) as $module) {
+            $remaining = $this->limit > 0 ? $this->limit - $result->get_records() : 0;
+
+            if ($this->limit > 0 && $remaining <= 0) {
+                $result->note('Reached the per-run limit; the rest waits for the next run.');
+
+                break;
+            }
+
             // Read the whole list before deleting any of it. Deleting an activity rebuilds the
             // course cache and fires events, which is not something to do underneath an open
             // recordset on the table being deleted from.
             $pending = [];
-            $orphans = $this->get_orphans($module);
+            $orphans = $this->get_orphans($module, $remaining);
 
             try {
                 foreach ($orphans as $orphan) {
@@ -290,9 +311,10 @@ class module_instances {
      * number.
      *
      * @param stdClass $module Module record, with an id and a name
+     * @param int $limit Most rows to read, or zero for all of them
      * @return moodle_recordset Rows of id, course and courseexists
      */
-    private function get_orphans(stdClass $module): moodle_recordset {
+    private function get_orphans(stdClass $module, int $limit = 0): moodle_recordset {
         $params = [
             'moduleid' => $module->id,
             'cutoff' => time() - ($this->daystokeep * DAYSECS),
@@ -325,7 +347,7 @@ class module_instances {
             $conditions
         );
 
-        return $this->db->get_recordset_sql($sql, $params);
+        return $this->db->get_recordset_sql($sql, $params, 0, $limit);
     }
 
     /**

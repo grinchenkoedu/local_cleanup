@@ -259,6 +259,46 @@ final class module_instances_test extends advanced_testcase {
     }
 
     /**
+     * A ceiling bounds one run, and what it does not reach waits for the next.
+     *
+     * @return void
+     */
+    public function test_a_limit_bounds_what_one_run_removes(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $course = $this->getDataGenerator()->create_course();
+        $this->strand('page', $course);
+        $this->strand('page', $course);
+
+        $repair = new module_instances($DB, self::GRACE_DAYS, ['page'], null, null, 1);
+        $result = $repair->execute(new spy_output());
+
+        $this->assertSame(1, $result->get_records());
+        $this->assertSame(1, $DB->count_records('page'), 'The second one waits for the next run.');
+    }
+
+    /**
+     * The report counts the whole backlog, whatever ceiling the run is given.
+     *
+     * @return void
+     */
+    public function test_a_limit_does_not_narrow_the_report(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $course = $this->getDataGenerator()->create_course();
+        $this->strand('page', $course);
+        $this->strand('page', $course);
+
+        $repair = new module_instances($DB, self::GRACE_DAYS, ['page'], null, null, 1);
+
+        $this->assertSame(2, $repair->report(new spy_output())->get_records());
+    }
+
+    /**
      * A module that is registered but not installed is reported and skipped, never queried.
      *
      * @return void

@@ -40,6 +40,7 @@ use local_cleanup\repair\module_instances;
         'days' => module_instances::DEFAULT_GRACE_DAYS,
         'courseid' => 0,
         'instanceid' => 0,
+        'limit' => 0,
     ],
     [
         'h' => 'help',
@@ -84,6 +85,9 @@ Options:
                         the activity row keeps the id of the course it belonged to.
         --instanceid=N  Only this one activity. Requires exactly one --modules value, because
                         instance ids are only unique within a module.
+        --limit=N       Stop after removing N activities, so a large backlog can be worked
+                        through over several runs. Default: no ceiling. The report always
+                        counts the lot, whatever this is set to.
         --days=N        Ignore activities modified in the last N days. Default: 7. This is what
                         keeps the repair off an activity that is mid-creation or mid-restore,
                         where having no course module yet is normal.
@@ -112,7 +116,7 @@ if (!empty($unknown)) {
 // --courseid=abc and a bare --courseid both come out as "no course named", which is every
 // course, and --days=abc comes out as no grace period at all. Reject anything that is not
 // already a whole number.
-foreach (['days', 'courseid', 'instanceid'] as $number) {
+foreach (['days', 'courseid', 'instanceid', 'limit'] as $number) {
     $given = $options[$number];
 
     if (!is_numeric($given) || (string)(int)$given !== (string)$given) {
@@ -123,9 +127,10 @@ foreach (['days', 'courseid', 'instanceid'] as $number) {
 $days = (int)$options['days'];
 $courseid = (int)$options['courseid'];
 $instanceid = (int)$options['instanceid'];
+$limit = (int)$options['limit'];
 
-if ($days < 0 || $courseid < 0 || $instanceid < 0) {
-    cli_error('--days, --courseid and --instanceid cannot be negative.');
+if ($days < 0 || $courseid < 0 || $instanceid < 0 || $limit < 0) {
+    cli_error('--days, --courseid, --instanceid and --limit cannot be negative.');
 }
 
 if ($instanceid > 0 && count($modules) !== 1) {
@@ -150,11 +155,16 @@ $repair = new module_instances(
     $days,
     $modules,
     $courseid > 0 ? $courseid : null,
-    $instanceid > 0 ? $instanceid : null
+    $instanceid > 0 ? $instanceid : null,
+    $limit
 );
 
 $output = new mtrace_output();
 $result = $remove ? $repair->execute($output) : $repair->report($output);
+
+foreach ($result->get_notes() as $note) {
+    $output->write_line($note);
+}
 
 $output->write_line(sprintf(
     '%s: %s',

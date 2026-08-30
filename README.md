@@ -290,7 +290,8 @@ php $MOODLE_DIR/local/cleanup/cli/fix_orphaned_instances.php --modules=assign --
 ```
 
 `--courseid` works for a course that has already been deleted, because the activity row keeps the
-id of the course it belonged to.
+id of the course it belonged to. `--limit=N` stops a run after N removals, for working through a
+large backlog over several nights; the report always counts the lot.
 
 What it does depends on whether that course survived:
 
