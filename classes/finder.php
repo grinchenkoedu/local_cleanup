@@ -16,6 +16,7 @@
 
 namespace local_cleanup;
 
+use cache;
 use dml_exception;
 use moodle_database;
 use moodle_recordset;
@@ -151,6 +152,28 @@ class finder {
         }
 
         return $values;
+    }
+
+    /**
+     * Which components own files on this site.
+     *
+     * Cached: this is a DISTINCT over {files}, which is the largest table on the sites this
+     * plugin exists for, and it would otherwise run on every load of the report.
+     *
+     * @return string[] Component names, sorted
+     */
+    public function get_components(): array {
+        $cache = cache::make('local_cleanup', 'componentlist');
+        $components = $cache->get('all');
+
+        if ($components === false) {
+            $components = $this->db->get_fieldset_sql(
+                'SELECT DISTINCT component FROM {files} ORDER BY component'
+            );
+            $cache->set('all', $components);
+        }
+
+        return $components;
     }
 
     /**

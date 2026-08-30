@@ -24,7 +24,9 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+$string['any'] = 'Any';
 $string['assignsubmission_file'] = 'Uploaded students\' submissions';
+$string['atleastsize'] = 'At least';
 $string['autoremove'] = 'Auto remove outdated files';
 $string['autoremovedesc'] = 'Remove outdated files found in the filesystem on clean-up';
 $string['awaitingscan'] = 'Not yet dated';
@@ -46,6 +48,7 @@ $string['componentfileslifetimedesc'] = 'Number of days to keep component files'
 $string['componentrecommended'] = '(recommended)';
 $string['coursemoduleslifetime'] = 'Course modules lifetime';
 $string['coursemoduleslifetimedesc'] = 'Number of days to keep orphaned course modules';
+$string['deletedusers'] = 'Owned by a deleted user';
 $string['draftlifetime'] = 'Draft files lifetime';
 $string['draftlifetimedesc'] = 'Number of days to keep draft files';
 $string['event_file_deleted'] = 'File deleted';

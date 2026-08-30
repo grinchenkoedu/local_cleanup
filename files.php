@@ -47,11 +47,12 @@ $filter = [
     'filesize' => optional_param('filesize', 50, PARAM_INT),
     'name_like' => optional_param('name_like', '', PARAM_TEXT),
     'user_like' => optional_param('user_like', '', PARAM_TEXT),
-    'component' => optional_param('component', '', PARAM_TEXT),
-    'user_deleted' => optional_param('user_deleted', '', PARAM_TEXT),
+    'component' => optional_param('component', '', PARAM_COMPONENT),
+    'user_deleted' => optional_param('user_deleted', 0, PARAM_BOOL),
 ];
 
-$filterform = new filter_form(null, $filter);
+$finder = new finder($DB);
+$filterform = new filter_form(null, $filter + ['components' => $finder->get_components()]);
 
 if ($filterform->is_cancelled()) {
     redirect($PAGE->url);
@@ -64,7 +65,7 @@ $baseurl = new moodle_url($PAGE->url, array_filter($filter, function ($value) {
 
 $table = new files_table(
     'local_cleanup_files_report',
-    new finder($DB),
+    $finder,
     $filter,
     $baseurl,
     has_capability('local/cleanup:deletefiles', context_system::instance())

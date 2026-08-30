@@ -28,19 +28,22 @@ use moodleform;
 class filter_form extends moodleform {
     /**
      * Define the form elements.
+     *
+     * @return void
      */
     protected function definition() {
         $form = $this->_form;
         $filesize = $this->_customdata['filesize'] ?? 0;
         $namelike = $this->_customdata['name_like'] ?? '';
         $userlike = $this->_customdata['user_like'] ?? '';
-        $userdeleted = $this->_customdata['user_deleted'] ?? false;
-        $component = $this->_customdata['component'] ?? null;
+        $userdeleted = $this->_customdata['user_deleted'] ?? 0;
+        $component = $this->_customdata['component'] ?? '';
+        $components = $this->_customdata['components'] ?? [];
 
         $form->addElement('header', 'header', get_string('filter'));
         $form->setExpanded(
             'header',
-            !empty($namelike) || !empty($userlike) || !empty($component)
+            !empty($namelike) || !empty($userlike) || !empty($component) || !empty($userdeleted)
         );
 
         $form->addElement('text', 'name_like', get_string('filename', 'backup'));
@@ -51,31 +54,59 @@ class filter_form extends moodleform {
         $form->setType('user_like', PARAM_TEXT);
         $form->setDefault('user_like', $userlike);
 
-        $form->addElement('checkbox', 'user_deleted', 'Deleted users');
+        // advcheckbox rather than checkbox: a plain checkbox submits nothing when cleared, so
+        // once ticked the filter could never be turned off again.
+        $form->addElement('advcheckbox', 'user_deleted', get_string('deletedusers', 'local_cleanup'));
+        $form->setType('user_deleted', PARAM_BOOL);
         $form->setDefault('user_deleted', $userdeleted);
 
-        $form->addElement('select', 'component', get_string('module', 'backup'), [
-            null => '-',
-            'tool_recyclebin' => get_string('pluginname', 'tool_recyclebin'),
-            'backup' => get_string('backup'),
-            'user' => get_string('user', 'admin'),
-        ]);
+        $form->addElement(
+            'select',
+            'component',
+            get_string('component', 'cache'),
+            $this->get_component_options($components)
+        );
+        $form->setType('component', PARAM_COMPONENT);
         $form->setDefault('component', $component);
 
-        $form->addElement('select', 'filesize', '>=', [
-            0 => '-',
-            10 => '10 MB',
-            50 => '50 MB',
-            100 => '100 MB',
-            200 => '200 MB',
-            500 => '500 MB',
-            1000 => '1 GB',
+        $form->addElement('select', 'filesize', get_string('atleastsize', 'local_cleanup'), [
+            0 => get_string('any', 'local_cleanup'),
+            10 => display_size(10 * 1024 * 1024),
+            50 => display_size(50 * 1024 * 1024),
+            100 => display_size(100 * 1024 * 1024),
+            200 => display_size(200 * 1024 * 1024),
+            500 => display_size(500 * 1024 * 1024),
+            1000 => display_size(1000 * 1024 * 1024),
         ]);
+        $form->setType('filesize', PARAM_INT);
         $form->setDefault('filesize', $filesize);
 
         $form->addGroup($this->get_buttons(), 'buttonarr', '', [' '], false);
 
         $form->disable_form_change_checker();
+    }
+
+    /**
+     * Build the component menu from the components that actually own files.
+     *
+     * The list used to be four hardcoded entries, which meant a site could not filter by
+     * anything else it happened to store.
+     *
+     * @param string[] $components Component names present in the files table
+     * @return array Menu options, keyed by component name
+     */
+    private function get_component_options(array $components): array {
+        $options = ['' => get_string('any', 'local_cleanup')];
+
+        foreach ($components as $name) {
+            // A component whose plugin has since been uninstalled still owns rows in {files},
+            // and get_string() would fail for it, so fall back to the raw frankenstyle name.
+            $options[$name] = get_string_manager()->string_exists('pluginname', $name)
+                ? get_string('pluginname', $name)
+                : $name;
+        }
+
+        return $options;
     }
 
     /**
