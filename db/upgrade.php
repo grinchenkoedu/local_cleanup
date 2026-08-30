@@ -20,11 +20,15 @@
  * @package    local_cleanup
  * @copyright  2024 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+defined('MOODLE_INTERNAL') || die();
+
+/**
+ * Upgrade the plugin's database schema.
  *
  * @param int $oldversion The old version number
- *
  * @return bool Success status
- *
  * @throws coding_exception
  * @throws ddl_exception
  */
