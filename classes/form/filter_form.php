@@ -54,8 +54,8 @@ class filter_form extends moodleform {
         $form->setType('user_like', PARAM_TEXT);
         $form->setDefault('user_like', $userlike);
 
-        // advcheckbox rather than checkbox: a plain checkbox submits nothing when cleared, so
-        // once ticked the filter could never be turned off again.
+        // An advcheckbox rather than a checkbox: a plain checkbox submits nothing when it is
+        // cleared, so once ticked the filter could never be turned off again.
         $form->addElement('advcheckbox', 'user_deleted', get_string('deletedusers', 'local_cleanup'));
         $form->setType('user_deleted', PARAM_BOOL);
         $form->setDefault('user_deleted', $userdeleted);
