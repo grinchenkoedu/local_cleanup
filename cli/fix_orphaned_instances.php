@@ -108,16 +108,24 @@ if (!empty($unknown)) {
     cli_error('Not an installed activity module: ' . implode(', ', $unknown));
 }
 
+// Casting straight to int would turn a typo into a wider run than the operator asked for:
+// --courseid=abc and a bare --courseid both come out as "no course named", which is every
+// course, and --days=abc comes out as no grace period at all. Reject anything that is not
+// already a whole number.
+foreach (['days', 'courseid', 'instanceid'] as $number) {
+    $given = $options[$number];
+
+    if (!is_numeric($given) || (string)(int)$given !== (string)$given) {
+        cli_error(sprintf('--%s needs a whole number, got: %s', $number, var_export($given, true)));
+    }
+}
+
 $days = (int)$options['days'];
 $courseid = (int)$options['courseid'];
 $instanceid = (int)$options['instanceid'];
 
-if ($days < 0) {
-    cli_error('--days cannot be negative.');
-}
-
-if ($courseid < 0 || $instanceid < 0) {
-    cli_error('--courseid and --instanceid must be positive.');
+if ($days < 0 || $courseid < 0 || $instanceid < 0) {
+    cli_error('--days, --courseid and --instanceid cannot be negative.');
 }
 
 if ($instanceid > 0 && count($modules) !== 1) {
