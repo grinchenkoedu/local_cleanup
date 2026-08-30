@@ -17,16 +17,20 @@ entry-point pages (`files.php`, `ghost.php`, `open.php`, `remove.php`, `download
 | Run | `hosted` — needs a Moodle 4.1+ install; the CLI entry points are in `README.md` |
 
 There is **no `php` on this host**, so lint runs in a container; anything else needing PHP goes
-through the same prefix. The image is pinned to `php:8.1-cli`, the lowest PHP in the CI matrix
-(8.1 / 8.3 / 8.4), so a pass here also holds for the newer two.
+through the same prefix. Lint on **both `php:7.4-cli` and `php:8.1-cli`**: 7.4 is the declared
+floor (`$plugin->phpversion`) and some sites run it, 8.1 is the lowest version the test matrix
+covers, and a pass on 8.1 holds for 8.3 and 8.4. `php -l` will not catch a PHP 8 only *function*
+— `str_contains` and friends parse on 7.4 and fatal at runtime — so CI greps for those too.
 
 The checks that gate a merge are in `.github/workflows/ci.yml`, run through `moodle-plugin-ci`:
 `phplint`, `codechecker --max-warnings 0`, `phpdoc --max-warnings 0`, `validate`, `savepoints`,
 `phpunit`, `behat`, `mustache`, `grunt`, `phpcpd`, `phpmd`, plus a grep that **fails the build
 on any direct `$_GET` / `$_POST` / `$_REQUEST`**. They run on PostgreSQL across three PHP and
 Moodle versions and on MySQL 8 — the second engine exists because a `GROUP BY` defect survived
-two years of single-engine CI. None of it is reproducible locally, so CI is the source of truth
-and runtime verification here is limited to lint.
+two years of single-engine CI. A fifth job, `php74-syntax`, lints every file on 7.4 and fails on
+PHP 8 only functions; `moodle-plugin-ci` needs PHP 8, so the suite itself cannot run there. None
+of it is reproducible locally, so CI is the source of truth and runtime verification here is
+limited to lint.
 
 Two style rules cost the most round trips: an inline comment must start with a capital letter,
 a digit or `...` (a lowercase function name at the start of a comment fails), and a class
