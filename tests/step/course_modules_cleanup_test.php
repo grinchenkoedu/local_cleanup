@@ -18,6 +18,7 @@ namespace local_cleanup\step;
 
 use advanced_testcase;
 use local_cleanup\output\spy_output;
+use stdClass;
 
 /**
  * Tests for the stuck course modules clean-up step.
@@ -157,13 +158,16 @@ final class course_modules_cleanup_test extends advanced_testcase {
 
         $this->resetAfterTest();
 
-        $cmid = $this->create_orphaned_module();
-        $taskid = $this->create_task([$cmid]);
+        $module = $this->create_orphaned_module();
+        $taskid = $this->create_task([$module->cmid]);
 
         $result = (new course_modules_cleanup($DB, self::KEEP_DAYS))->report(new spy_output());
 
         $this->assertSame(2, $result->get_records(), 'One orphan plus one stuck module.');
-        $this->assertTrue($DB->record_exists('course_modules', ['id' => $cmid]), 'A dry run must remove nothing.');
+        $this->assertTrue(
+            $DB->record_exists('course_modules', ['id' => $module->cmid]),
+            'A dry run must remove nothing.'
+        );
         $this->assertTrue($DB->record_exists('task_adhoc', ['id' => $taskid]), 'A dry run must clear no task.');
     }
 
@@ -211,6 +215,60 @@ final class course_modules_cleanup_test extends advanced_testcase {
     }
 
     /**
+     * Forcing a module through deletion takes the activity with it.
+     *
+     * The activity's own row is what the manual fallback used to leave behind, and a row with
+     * no course module pointing at it is unreachable from the site but not from cron: the
+     * module's scheduled task still selects it, and then fails on it for the whole site.
+     *
+     * @return void
+     */
+    public function test_a_forced_deletion_takes_the_activity_with_it(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $module = $this->create_orphaned_module();
+
+        (new course_modules_cleanup($DB, self::KEEP_DAYS))->execute(new spy_output());
+
+        $this->assertFalse($DB->record_exists('course_modules', ['id' => $module->cmid]));
+        $this->assertFalse(
+            $DB->record_exists('page', ['id' => $module->id]),
+            'The activity must not be left behind with nothing pointing at it.'
+        );
+    }
+
+    /**
+     * An activity that has already gone does not stop its module being cleaned up.
+     *
+     * course_delete_module() can fail after the module's own delete_instance() has already
+     * succeeded, so the fallback has to expect the activity to be missing and finish anyway.
+     *
+     * @return void
+     */
+    public function test_a_module_whose_activity_has_already_gone_is_still_removed(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $course = $this->getDataGenerator()->create_course();
+        $module = $this->getDataGenerator()->create_module('page', ['course' => $course->id]);
+
+        // Without its own row the module's delete_instance() returns false, which is what sends
+        // core's deletion into the failure the fallback below picks up.
+        $DB->delete_records('page', ['id' => $module->id]);
+        $this->create_task([$module->cmid]);
+
+        (new course_modules_cleanup($DB, self::KEEP_DAYS))->execute(new spy_output());
+
+        $this->assertFalse(
+            $DB->record_exists('course_modules', ['id' => $module->cmid]),
+            'The module should still be cleaned up.'
+        );
+    }
+
+    /**
      * Run the dry run and hand back what it wrote.
      *
      * @return spy_output The captured output
@@ -239,9 +297,9 @@ final class course_modules_cleanup_test extends advanced_testcase {
     /**
      * Create a module and then remove its course row, leaving the module orphaned.
      *
-     * @return int The course module id
+     * @return stdClass The activity, with its own id and its cmid
      */
-    private function create_orphaned_module(): int {
+    private function create_orphaned_module(): stdClass {
         global $DB;
 
         $course = $this->getDataGenerator()->create_course();
@@ -251,7 +309,7 @@ final class course_modules_cleanup_test extends advanced_testcase {
         // with it, which is the situation this step exists because Moodle did not reach.
         $DB->delete_records('course', ['id' => $course->id]);
 
-        return (int)$module->cmid;
+        return $module;
     }
 
     /**
