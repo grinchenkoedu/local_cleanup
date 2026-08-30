@@ -134,11 +134,12 @@ works in testing.
   and `config::CLEANABLE_COMPONENTS` is a fixed allowlist so a stray database value cannot
   widen the blast radius.
 - **This plugin's whole purpose is deletion**, largely from `files` and `local_cleanup_files`
-  plus grade and log tables. Treat `classes/steps/*` as data-safety critical: bounded scope,
+  plus grade and log tables. Treat `classes/step/*` as data-safety critical: bounded scope,
   idempotent re-runs, and never widen a `WHERE` without knowing what it now matches. Every step
-  has a test asserting both what it deletes and what it leaves, except
-  `classes/steps/CourseModulesCleanup.php`; match that pattern. Despite its name,
-  `FilesCheckout` deletes — there is no dry-run mode anywhere yet.
+  has a test asserting both what it deletes and what it leaves; match that pattern. Every step
+  also implements `report()` alongside `execute()`, and `cli/cleanup.php` reports unless it is
+  given `--execute`, so a dry run is the default — keep it that way. Despite its name,
+  `files_checkout` deletes.
 - **Scheduled tasks must do no work in their constructor.** Moodle instantiates them when it
   re-registers a component, and `ghost.php` builds one purely to read its next run time.
   `classes/task/cleanup.php` reads configuration in `execute()` for that reason.
