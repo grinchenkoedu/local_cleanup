@@ -102,6 +102,52 @@ class files_table extends table_sql {
     }
 
     /**
+     * Neutralise a value a spreadsheet would treat as a formula.
+     *
+     * A cell beginning =, +, - or @ is executed when the file is opened, so a file named
+     * "=cmd|'/c calc'!A0.pdf" runs on the machine of whoever opens the export. Prefixing an
+     * apostrophe is the standard defence: spreadsheets read it as "this is text" and drop it.
+     *
+     * @param string $value The raw value
+     * @return string Safe to place in a spreadsheet cell
+     */
+    public static function neutralise_formula(string $value): string {
+        if ($value !== '' && strpos("=+-@\t\r", $value[0]) !== false) {
+            return "'" . $value;
+        }
+
+        return $value;
+    }
+
+    /**
+     * Render text safely for whichever output this is.
+     *
+     * table_sql does not escape cell contents - that is what these methods are for - and the
+     * two outputs need opposite things: HTML wants entities, a spreadsheet wants none of them
+     * but does need formulas defused.
+     *
+     * @param string $value The raw value
+     * @return string Cell contents
+     */
+    private function text(string $value): string {
+        if ($this->is_downloading()) {
+            return self::neutralise_formula($value);
+        }
+
+        return s($value);
+    }
+
+    /**
+     * Show the file name.
+     *
+     * @param object $row The record
+     * @return string Cell contents
+     */
+    public function col_filename($row): string {
+        return $this->text((string)$row->filename);
+    }
+
+    /**
      * Show the component and its file area together.
      *
      * @param object $row The record
