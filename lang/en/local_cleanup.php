@@ -71,6 +71,7 @@ $string['mimetype'] = 'Type';
 $string['nextcleanup'] = 'Next clean-up: {$a}';
 $string['nothingtoshow'] = 'Nothing to show';
 $string['pluginname'] = 'Clean-up';
+$string['privacy:metadata'] = 'The Clean-up plugin stores no personal data. It removes files and records that other parts of Moodle own, and keeps only a list of file pool paths that no database record refers to.';
 $string['settingspage'] = 'Clean-up settings';
 $string['taskcleanup'] = 'Database and disk clean-up';
 $string['taskscan'] = 'Scan for unlinked files';
