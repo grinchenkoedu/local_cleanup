@@ -246,7 +246,6 @@ class finder {
      */
     private function get_search_sql(array $filter, bool $count = false): string {
         $parts = $this->get_sql_parts($filter);
-        $where = [$parts['where']];
 
         if ($count) {
             return sprintf(
