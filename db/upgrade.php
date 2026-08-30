@@ -115,5 +115,51 @@ function xmldb_local_cleanup_upgrade($oldversion = 0) {
         upgrade_plugin_savepoint(true, 2026082902, 'local', 'cleanup');
     }
 
+    if ($oldversion < 2026082906) {
+        $table = new xmldb_table('local_cleanup_files');
+
+        // When a scan first found the file unreferenced, and when it last did. An unlinked
+        // file is only removed once two scans a grace period apart have both seen it, so a
+        // file that reappears in between is never destroyed on the strength of one sighting.
+        $confirmed = new xmldb_field(
+            'timeconfirmed',
+            XMLDB_TYPE_INTEGER,
+            '10',
+            null,
+            XMLDB_NOTNULL,
+            null,
+            '0',
+            'size'
+        );
+
+        if (!$manager->field_exists($table, $confirmed)) {
+            $manager->add_field($table, $confirmed);
+        }
+
+        $scanned = new xmldb_field(
+            'timescanned',
+            XMLDB_TYPE_INTEGER,
+            '10',
+            null,
+            XMLDB_NOTNULL,
+            null,
+            '0',
+            'timeconfirmed'
+        );
+
+        if (!$manager->field_exists($table, $scanned)) {
+            $manager->add_field($table, $scanned);
+        }
+
+        // The scan looks a row up by path for every file it walks.
+        $index = new xmldb_index('path', XMLDB_INDEX_NOTUNIQUE, ['path']);
+
+        if (!$manager->index_exists($table, $index)) {
+            $manager->add_index($table, $index);
+        }
+
+        upgrade_plugin_savepoint(true, 2026082906, 'local', 'cleanup');
+    }
+
     return true;
 }

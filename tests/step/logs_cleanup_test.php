@@ -19,6 +19,7 @@ namespace local_cleanup\step;
 use advanced_testcase;
 use context_system;
 use local_cleanup\output\spy_output;
+use local_cleanup\step_result;
 
 /**
  * Tests for the logs clean-up step.
@@ -111,9 +112,64 @@ final class logs_cleanup_test extends advanced_testcase {
 
         $output = $this->run_cleanup();
 
+        $this->assertFalse(
+            $output->contains('logstore_lanalytics_log'),
+            'A table this site does not have should not appear in the run at all.'
+        );
         $this->assertTrue(
-            $output->contains('Skipping cleanup of logstore_lanalytics_log'),
-            'The step should say it skipped the optional table.'
+            $output->contains('logstore_standard_log'),
+            'The table it does have should still be cleaned.'
+        );
+    }
+
+    /**
+     * A dry run counts the same entries and removes none of them.
+     *
+     * @return void
+     */
+    public function test_report_counts_without_deleting(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $old = $this->create_log(time() - (self::KEEP_DAYS + 1) * DAYSECS);
+        $before = $DB->count_records('logstore_standard_log');
+
+        $result = $this->run_report();
+
+        $this->assertGreaterThanOrEqual(1, $result->get_records());
+        $this->assertTrue($DB->record_exists('logstore_standard_log', ['id' => $old]));
+        $this->assertSame(
+            $before,
+            $DB->count_records('logstore_standard_log'),
+            'A dry run must write nothing.'
+        );
+    }
+
+    /**
+     * The per-run ceiling stops the step partway and leaves the rest for next time.
+     *
+     * @return void
+     */
+    public function test_the_per_run_ceiling_is_honoured(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        set_config('maxrecordsperrun', 1, 'local_cleanup');
+
+        $outdated = time() - (self::KEEP_DAYS + 1) * DAYSECS;
+        $first = $this->create_log($outdated);
+        $second = $this->create_log($outdated);
+
+        $result = $this->run_cleanup_result();
+
+        $this->assertSame(1, $result->get_records(), 'The ceiling caps what one run removes.');
+        $this->assertSame(
+            1,
+            (int)$DB->record_exists('logstore_standard_log', ['id' => $first])
+                + (int)$DB->record_exists('logstore_standard_log', ['id' => $second]),
+            'Exactly one of the two should survive to the next run.'
         );
     }
 
@@ -127,9 +183,31 @@ final class logs_cleanup_test extends advanced_testcase {
 
         $output = new spy_output();
         $step = new logs_cleanup($DB, self::KEEP_DAYS);
-        $step->cleanup($output);
+        $step->execute($output);
 
         return $output;
+    }
+
+    /**
+     * Run the step under test and return what it did.
+     *
+     * @return step_result What was removed
+     */
+    private function run_cleanup_result(): step_result {
+        global $DB;
+
+        return (new logs_cleanup($DB, self::KEEP_DAYS))->execute(new spy_output());
+    }
+
+    /**
+     * Report on the step under test.
+     *
+     * @return step_result What would be removed
+     */
+    private function run_report(): step_result {
+        global $DB;
+
+        return (new logs_cleanup($DB, self::KEEP_DAYS))->report(new spy_output());
     }
 
     /**

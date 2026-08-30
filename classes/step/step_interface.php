@@ -17,6 +17,7 @@
 namespace local_cleanup\step;
 
 use local_cleanup\output\output_interface;
+use local_cleanup\step_result;
 
 /**
  * Interface for cleanup steps.
@@ -27,10 +28,28 @@ use local_cleanup\output\output_interface;
  */
 interface step_interface {
     /**
-     * Execute the cleanup step.
+     * Name this step, for the operator reading a report.
      *
-     * @param output_interface $output Output handler for logging
-     * @return void
+     * @return string Short human-readable name
      */
-    public function cleanup(output_interface $output);
+    public function get_name(): string;
+
+    /**
+     * Count what this step would remove, without removing any of it.
+     *
+     * Implementations of this method must not write. It is what makes a dry run trustworthy,
+     * and it is the default the scheduled task takes.
+     *
+     * @param output_interface $output Output handler for progress
+     * @return step_result What would be removed
+     */
+    public function report(output_interface $output): step_result;
+
+    /**
+     * Remove it.
+     *
+     * @param output_interface $output Output handler for progress
+     * @return step_result What was removed
+     */
+    public function execute(output_interface $output): step_result;
 }

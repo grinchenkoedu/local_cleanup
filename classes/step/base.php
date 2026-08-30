@@ -17,6 +17,8 @@
 namespace local_cleanup\step;
 
 use local_cleanup\output\output_interface;
+use local_cleanup\config;
+use local_cleanup\step_result;
 use moodle_database;
 
 /**
@@ -35,7 +37,7 @@ abstract class base implements step_interface {
     protected $db;
 
     /**
-     * Maximum number of records to process in a single batch.
+     * Maximum number of records to delete in a single statement.
      */
     const BATCH_SIZE = 999;
 
@@ -49,97 +51,158 @@ abstract class base implements step_interface {
     }
 
     /**
-     * Execute the cleanup step.
+     * Describe everything this step targets.
      *
-     * @param output_interface $output Output handler for logging
-     * @return void
+     * One definition serves both report() and execute(), so a dry run cannot describe something
+     * different from what the real run removes.
+     *
+     * Each entry is ['table' => string, 'sql' => string, 'params' => array, 'message' => string]
+     * where the query selects nothing but the id column of the rows to remove.
+     *
+     * @return array[] Candidate sets
      */
-    abstract public function cleanup(output_interface $output);
+    abstract protected function get_candidates(): array;
 
     /**
-     * Process records in batches and delete them
+     * Count what would be removed, touching nothing.
      *
-     * @param string $table The database table name
-     * @param string $alias The table alias used in the SQL query
-     * @param string $sql The SQL query to find records to delete
-     * @param array $params The parameters for the SQL query
-     * @param string $message The message to display when checking for records
-     * @param output_interface $output The output interface for logging
+     * @param output_interface $output Output handler for progress
+     * @return step_result What would be removed
+     */
+    public function report(output_interface $output): step_result {
+        $result = new step_result();
+
+        foreach ($this->get_candidates() as $candidate) {
+            $count = (int)$this->db->count_records_sql(
+                sprintf('SELECT COUNT(1) FROM (%s) candidates', $candidate['sql']),
+                $candidate['params']
+            );
+
+            $result->add($count);
+            $output->write_line(sprintf(
+                '%s: %d record(s) would be deleted (%s)',
+                $candidate['table'],
+                $count,
+                $candidate['message']
+            ));
+        }
+
+        return $result;
+    }
+
+    /**
+     * Remove it.
+     *
+     * @param output_interface $output Output handler for progress
+     * @return step_result What was removed
+     */
+    public function execute(output_interface $output): step_result {
+        $result = new step_result();
+        $ceiling = config::max_records_per_run();
+
+        foreach ($this->get_candidates() as $candidate) {
+            $remaining = $ceiling > 0 ? $ceiling - $result->get_records() : 0;
+
+            if ($ceiling > 0 && $remaining <= 0) {
+                $result->note('Reached the per-run limit; the rest waits for the next run.');
+
+                break;
+            }
+
+            $result->add($this->process_records_in_batches(
+                $candidate['table'],
+                $candidate['sql'],
+                $candidate['params'],
+                $candidate['message'],
+                $output,
+                $remaining
+            ));
+        }
+
+        return $result;
+    }
+
+    /**
+     * Delete the rows a query selects, a batch at a time.
+     *
+     * The candidate query is wrapped in a derived table rather than having conditions appended
+     * to it. Appending "AND alias.id > :lastid" to a WHERE clause containing a top-level OR
+     * binds only to the last branch, so the batch bound silently did not apply to the rest.
+     *
+     * @param string $table The table to delete from
+     * @param string $sql Query selecting the ids to remove
+     * @param array $params Parameters for that query
+     * @param string $message What is being cleaned, for the log
+     * @param output_interface $output Output handler for progress
+     * @param int $ceiling Stop after this many records, or 0 for no limit
+     * @return int Number of records deleted
      */
     protected function process_records_in_batches(
-        $table,
-        $alias,
-        $sql,
-        $params,
-        $message,
-        output_interface $output
-    ): void {
+        string $table,
+        string $sql,
+        array $params,
+        string $message,
+        output_interface $output,
+        int $ceiling = 0
+    ): int {
         $output->write_line(sprintf('Cleaning %s: %s', $table, $message));
 
-        $limit = self::BATCH_SIZE * 100;
+        $pagesize = self::BATCH_SIZE * 100;
+        $bounded = sprintf(
+            'SELECT candidates.id FROM (%s) candidates WHERE candidates.id > :lastid ORDER BY candidates.id ASC',
+            $sql
+        );
+
         $totaldeleted = 0;
-        $batchnumber = 0;
         $lastid = 0;
 
         do {
-            if ($batchnumber > 0) {
-                $output->write_line(
-                    sprintf(
-                        'Cleaning %s: Loading batch %d...',
-                        $table,
-                        $batchnumber + 1
-                    )
-                );
-            }
-
-            $boundedsql = sprintf(
-                '%s AND %s.id > :lastid ORDER BY %s.id ASC LIMIT %d',
-                $sql,
-                $alias,
-                $alias,
-                $limit
-            );
-            $boundedparams = array_merge($params, ['lastid' => $lastid]);
-
             $starttime = microtime(true);
+            $ids = array_keys($this->db->get_records_sql(
+                $bounded,
+                array_merge($params, ['lastid' => $lastid]),
+                0,
+                $pagesize
+            ));
+            $found = count($ids);
 
-            $ids = $this->db->get_fieldset_sql($boundedsql, $boundedparams);
-            $lastid = end($ids);
-            $count = count($ids);
-            $batchnumber++;
-
-            if ($count > 0) {
-                $output->write('Deleting..');
-
-                while (!empty($ids)) {
-                    $batchids = array_splice($ids, 0, self::BATCH_SIZE);
-                    $batchcount = count($batchids);
-                    $totaldeleted += $batchcount;
-
-                    $this->db->delete_records_list($table, 'id', $batchids);
-                    $output->write('.');
-                }
-
-                // The microtime() call gives a float, and % is an integer operation. Leaving
-                // PHP to convert implicitly is deprecated from 8.1 when precision is lost,
-                // which is every batch not taking a whole number of seconds.
-                $elapsedseconds = (int)round(microtime(true) - $starttime);
-                $output->write_line(
-                    sprintf(
-                        'OK (took %02d:%02d)',
-                        intdiv($elapsedseconds, 60),
-                        $elapsedseconds % 60
-                    )
-                );
+            if ($found === 0) {
+                break;
             }
-        } while ($count === $limit);
+
+            if ($ceiling > 0 && $totaldeleted + $found > $ceiling) {
+                $ids = array_slice($ids, 0, $ceiling - $totaldeleted);
+                $found = count($ids);
+            }
+
+            $lastid = end($ids);
+            $output->write('Deleting..');
+
+            while (!empty($ids)) {
+                $batch = array_splice($ids, 0, self::BATCH_SIZE);
+                $totaldeleted += count($batch);
+
+                $this->db->delete_records_list($table, 'id', $batch);
+                $output->write('.');
+            }
+
+            // The microtime() call gives a float, and % is an integer operation. Leaving PHP to
+            // convert implicitly is deprecated from 8.1 when precision is lost, which is every
+            // batch not taking a whole number of seconds.
+            $elapsedseconds = (int)round(microtime(true) - $starttime);
+            $output->write_line(sprintf(
+                'OK (took %02d:%02d)',
+                intdiv($elapsedseconds, 60),
+                $elapsedseconds % 60
+            ));
+        } while ($found === $pagesize && ($ceiling === 0 || $totaldeleted < $ceiling));
 
         if ($totaldeleted === 0) {
             $output->write_line('None found.');
-
-            return;
+        } else {
+            $output->write_line("Total records deleted: $totaldeleted. Done.");
         }
 
-        $output->write_line("Total records deleted: $totaldeleted. Done.");
+        return $totaldeleted;
     }
 }

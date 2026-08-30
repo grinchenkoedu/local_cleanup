@@ -18,6 +18,8 @@ namespace local_cleanup\step;
 
 use file_storage;
 use local_cleanup\output\output_interface;
+use local_cleanup\config;
+use local_cleanup\step_result;
 use moodle_database;
 use stored_file;
 
@@ -90,111 +92,156 @@ class files_checkout implements step_interface {
     }
 
     /**
-     * Execute the cleanup step.
-     *
-     * Checks all files and removes outdated backups and draft files.
-     *
-     * @param output_interface $output Output handler for logging
-     * @return void
+     * Candidates fetched per batch.
      */
-    public function cleanup(output_interface $output) {
-        $output->write('Fetching records... ');
+    const BATCH_SIZE = 500;
 
-        $ids = $this->db->get_fieldset_select('files', 'id', self::SELECT_ALL);
-        $count = count($ids);
-        $progress = 0;
-
-        $output->write_line(sprintf('%d records found.', count($ids)));
-        $output->write('Processing... ');
-
-        foreach ($ids as $index => $id) {
-            $done = ceil(($index * 100) / $count);
-
-            if ($done > $progress) {
-                $output->write(sprintf('%d%%... ', $done));
-                $progress = $done;
-            }
-
-            if ($this->checkout($id, $output)) {
-                continue;
-            }
-
-            $this->db->delete_records('files', ['id' => $id]);
-        }
+    /**
+     * Name this step.
+     *
+     * @return string Short human-readable name
+     */
+    public function get_name(): string {
+        return 'Outdated backups and drafts';
     }
 
     /**
-     * Check a file and remove it if it's outdated.
+     * Count what would go. One query, touching no files.
      *
-     * @param int $id File ID to check
-     * @param output_interface $output Output handler for logging
-     * @return bool True if the file should be kept, false if it was removed
+     * @param output_interface $output Output handler for progress
+     * @return step_result What would be removed
      */
-    private function checkout($id, output_interface $output): bool {
-        $file = $this->fs->get_file_by_id($id);
+    public function report(output_interface $output): step_result {
+        [$sql, $params] = $this->get_candidate_sql();
 
-        if ($file === false) {
-            // Wrong id provided (maybe already removed), continue...
-            return true;
-        }
+        $totals = $this->db->get_record_sql(
+            sprintf(
+                'SELECT COUNT(1) AS records, COALESCE(SUM(candidates.filesize), 0) AS bytes FROM (%s) candidates',
+                $sql
+            ),
+            $params
+        );
 
-        $resource = $this->fs->get_file_system()->get_content_file_handle($file);
+        $result = new step_result();
+        $result->add((int)$totals->records, (int)$totals->bytes);
 
-        if ($resource === false) {
-            $output->write_line(sprintf('File "%s" is not found or not readable. Removed.', $id));
+        $output->write_line(sprintf('Outdated backups and drafts: %s', $result->summarise()));
 
-            return false;
-        }
+        return $result;
+    }
 
-        $uri = stream_get_meta_data($resource)['uri'];
-        fclose($resource);
+    /**
+     * Remove the outdated backups and drafts.
+     *
+     * @param output_interface $output Output handler for progress
+     * @return step_result What was removed
+     */
+    public function execute(output_interface $output): step_result {
+        [$sql, $params] = $this->get_candidate_sql();
+        $bounded = sprintf(
+            'SELECT candidates.id, candidates.filesize
+               FROM (%s) candidates
+              WHERE candidates.id > :lastid
+           ORDER BY candidates.id ASC',
+            $sql
+        );
 
-        if (
-            preg_match('/\.mbz$/', $file->get_filename())
-            && $file->get_timecreated() <= time() - $this->backuptimeout
-            && $this->is_last_reference($file)
-        ) {
-            unlink($uri);
-            $output->write_line(sprintf(
-                'Backup "%s" (%s) is outdated. Removed.',
-                $file->get_filename(),
-                $file->get_contenthash()
-            ));
+        $result = new step_result();
+        $ceiling = config::max_records_per_run();
+        $lastid = 0;
 
-            return false;
-        }
-
-        if (
-            $file->get_filearea() === 'draft'
-            && $file->get_timecreated() <= time() - $this->drafttimeout
-            && $this->is_last_reference($file)
-        ) {
-            unlink($uri);
-            $output->write_line(
-                sprintf(
-                    'Outdated draft "%s" (%s). Removed.',
-                    $file->get_filename(),
-                    $file->get_contenthash()
-                )
+        do {
+            $batch = $this->db->get_records_sql(
+                $bounded,
+                array_merge($params, ['lastid' => $lastid]),
+                0,
+                self::BATCH_SIZE
             );
 
-            return false;
-        }
+            foreach ($batch as $row) {
+                $lastid = (int)$row->id;
+                $file = $this->fs->get_file_by_id($row->id);
 
-        return true;
+                if ($file === false) {
+                    // Gone between the query and now.
+                    continue;
+                }
+
+                $this->remove($file, $output);
+                $result->add(1, (int)$row->filesize);
+                $output->write('.');
+
+                if ($ceiling > 0 && $result->get_records() >= $ceiling) {
+                    $result->note('Reached the per-run limit; the rest waits for the next run.');
+
+                    break 2;
+                }
+            }
+        } while (count($batch) === self::BATCH_SIZE);
+
+        $output->write_line($result->summarise());
+
+        return $result;
     }
 
     /**
-     * Check whether this record is the only one referencing its content.
+     * The query behind both paths: outdated backups and drafts nothing else references.
      *
-     * Moodle deduplicates file content by hash, so the pool file may only be unlinked when no
-     * other record points at it. Without this the removal of one outdated backup destroys the
-     * content of every other record sharing the same bytes.
+     * Expressed in SQL rather than decided file by file. The previous version opened every
+     * file record on the site and asked three questions about each, which the scheduled task
+     * now does on every run because reporting is the default - on a large pool that is hours
+     * of work to produce a number. It also asked the expensive question first, counting
+     * records sharing a content hash before checking the cheap conditions that could rule the
+     * file out.
      *
-     * @param stored_file $file File to check
-     * @return bool True when no other record shares the content hash
+     * @return array The query and its parameters
      */
-    private function is_last_reference(stored_file $file): bool {
-        return 1 === $this->db->count_records('files', ['contenthash' => $file->get_contenthash()]);
+    private function get_candidate_sql(): array {
+        $backup = $this->db->sql_like('f.filename', ':backupsuffix', false);
+
+        $sql = "SELECT f.id, f.filesize
+                  FROM {files} f
+                 WHERE (
+                         ($backup AND f.timecreated <= :backupcutoff)
+                      OR (f.filearea = :draftarea AND f.timecreated <= :draftcutoff)
+                       )
+                   AND NOT EXISTS (
+                         SELECT 1
+                           FROM {files} o
+                          WHERE o.contenthash = f.contenthash
+                            AND o.id <> f.id
+                       )";
+
+        return [
+            $sql,
+            [
+                'backupsuffix' => '%' . $this->db->sql_like_escape('.mbz'),
+                'backupcutoff' => time() - $this->backuptimeout,
+                'draftarea' => 'draft',
+                'draftcutoff' => time() - $this->drafttimeout,
+            ],
+        ];
+    }
+
+    /**
+     * Remove the pool file, where there is one, and then the record.
+     *
+     * @param stored_file $file File to remove
+     * @param output_interface $output Output handler for progress
+     * @return void
+     */
+    private function remove(stored_file $file, output_interface $output): void {
+        $handle = $this->fs->get_file_system()->get_content_file_handle($file);
+
+        if ($handle !== false) {
+            $uri = stream_get_meta_data($handle)['uri'];
+            fclose($handle);
+
+            if (!unlink($uri)) {
+                $output->write_line(sprintf('Could not unlink "%s".', $uri));
+            }
+        }
+
+        $this->db->delete_records('files', ['id' => $file->get_id()]);
     }
 }

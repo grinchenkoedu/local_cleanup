@@ -19,6 +19,7 @@ namespace local_cleanup\step;
 use advanced_testcase;
 use context_system;
 use local_cleanup\output\spy_output;
+use local_cleanup\step_result;
 use stored_file;
 
 /**
@@ -145,6 +146,83 @@ final class files_checkout_test extends advanced_testcase {
     }
 
     /**
+     * A dry run counts the outdated backup and removes nothing.
+     *
+     * @return void
+     */
+    public function test_report_counts_without_deleting(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $file = $this->create_backup('lonely.mbz', 'unique ' . random_string(32), $this->outdated());
+        $before = $DB->count_records('files');
+
+        $result = $this->run_report();
+
+        $this->assertSame(1, $result->get_records());
+        $this->assertSame((int)$file->get_filesize(), $result->get_bytes());
+        $this->assertTrue($DB->record_exists('files', ['id' => $file->get_id()]));
+        $this->assertSame($before, $DB->count_records('files'), 'A dry run must write nothing.');
+    }
+
+    /**
+     * The per-run ceiling stops the step partway and leaves the rest for next time.
+     *
+     * @return void
+     */
+    public function test_the_per_run_ceiling_is_honoured(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        set_config('maxrecordsperrun', 1, 'local_cleanup');
+
+        $first = $this->create_backup('one.mbz', 'first ' . random_string(32), $this->outdated());
+        $second = $this->create_backup('two.mbz', 'second ' . random_string(32), $this->outdated());
+
+        $this->run_checkout();
+
+        $this->assertSame(
+            1,
+            (int)$DB->record_exists('files', ['id' => $first->get_id()])
+                + (int)$DB->record_exists('files', ['id' => $second->get_id()]),
+            'Exactly one of the two backups should survive to the next run.'
+        );
+    }
+
+    /**
+     * A record whose pool content has vanished is left alone.
+     *
+     * This step used to sweep the whole table for those and delete them. That is an integrity
+     * check rather than a lifetime one, it cannot be expressed in the candidate query, and it
+     * was the only reason to open every file on the site. Pinned here so the narrowing is
+     * deliberate rather than something a later change quietly undoes either way.
+     *
+     * @return void
+     */
+    public function test_a_record_with_missing_content_is_left_alone(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $file = $this->create_backup('gone.txt', 'vanishing ' . random_string(32), $this->outdated());
+        $handle = get_file_storage()->get_file_system()->get_content_file_handle($file);
+        $uri = stream_get_meta_data($handle)['uri'];
+        fclose($handle);
+
+        // Take the content out from under the record, as a botched manual clean-up would.
+        unlink($uri);
+
+        $this->run_checkout();
+
+        $this->assertTrue(
+            $DB->record_exists('files', ['id' => $file->get_id()]),
+            'A record with no content behind it is broken, but removing it is not this step\'s job.'
+        );
+    }
+
+    /**
      * Run the step under test.
      *
      * @return spy_output The captured output
@@ -154,9 +232,22 @@ final class files_checkout_test extends advanced_testcase {
 
         $output = new spy_output();
         $step = new files_checkout($DB, get_file_storage(), self::TIMEOUT_DAYS, self::TIMEOUT_DAYS);
-        $step->cleanup($output);
+        $step->execute($output);
 
         return $output;
+    }
+
+    /**
+     * Report on the step under test.
+     *
+     * @return step_result What would be removed
+     */
+    private function run_report(): step_result {
+        global $DB;
+
+        $step = new files_checkout($DB, get_file_storage(), self::TIMEOUT_DAYS, self::TIMEOUT_DAYS);
+
+        return $step->report(new spy_output());
     }
 
     /**

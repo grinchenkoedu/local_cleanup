@@ -19,6 +19,7 @@ namespace local_cleanup;
 use local_cleanup\step\component_files_cleanup;
 use local_cleanup\step\course_modules_cleanup;
 use local_cleanup\step\files_checkout;
+use local_cleanup\step\ghost_files_cleanup;
 use local_cleanup\step\grades_cleanup;
 use local_cleanup\step\logs_cleanup;
 
@@ -134,6 +135,27 @@ class config {
      */
     public static function grades_lifetime_days(): int {
         return self::days('gradeslifetimedays', grades_cleanup::DEFAULT_LIFETIME_DAYS);
+    }
+
+    /**
+     * Most records any one step may remove in a single run.
+     *
+     * Zero means no ceiling, which is the default: a limit that applied without being asked
+     * for would quietly leave work undone every night.
+     *
+     * @return int Maximum records per step per run, or 0 for no limit
+     */
+    public static function max_records_per_run(): int {
+        return max(0, (int)self::get('maxrecordsperrun'));
+    }
+
+    /**
+     * Days that must pass between the two scans that agree a file is unlinked.
+     *
+     * @return int Days
+     */
+    public static function ghost_grace_days(): int {
+        return self::days('ghostgracedays', ghost_files_cleanup::DEFAULT_GRACE_DAYS);
     }
 
     /**

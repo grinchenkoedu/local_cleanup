@@ -18,6 +18,7 @@ namespace local_cleanup\step;
 
 use advanced_testcase;
 use local_cleanup\output\spy_output;
+use local_cleanup\step_result;
 
 /**
  * Tests for the grades clean-up step.
@@ -168,6 +169,26 @@ final class grades_cleanup_test extends advanced_testcase {
     }
 
     /**
+     * A dry run counts the same records and removes none of them.
+     *
+     * @return void
+     */
+    public function test_report_counts_without_deleting(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $orphan = $this->create_grade_item(self::MISSING_ID);
+        $before = $DB->count_records('grade_items');
+
+        $result = $this->run_report();
+
+        $this->assertGreaterThanOrEqual(1, $result->get_records());
+        $this->assertTrue($DB->record_exists('grade_items', ['id' => $orphan]));
+        $this->assertSame($before, $DB->count_records('grade_items'), 'A dry run must write nothing.');
+    }
+
+    /**
      * Run the step under test.
      *
      * @return spy_output The captured output
@@ -177,9 +198,20 @@ final class grades_cleanup_test extends advanced_testcase {
 
         $output = new spy_output();
         $step = new grades_cleanup($DB, self::KEEP_DAYS);
-        $step->cleanup($output);
+        $step->execute($output);
 
         return $output;
+    }
+
+    /**
+     * Report on the step under test.
+     *
+     * @return step_result What would be removed
+     */
+    private function run_report(): step_result {
+        global $DB;
+
+        return (new grades_cleanup($DB, self::KEEP_DAYS))->report(new spy_output());
     }
 
     /**

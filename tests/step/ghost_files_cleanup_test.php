@@ -19,6 +19,7 @@ namespace local_cleanup\step;
 use advanced_testcase;
 use context_system;
 use local_cleanup\output\spy_output;
+use local_cleanup\step_result;
 
 /**
  * Tests for the unlinked ("ghost") files clean-up step.
@@ -29,6 +30,11 @@ use local_cleanup\output\spy_output;
  * @covers     \local_cleanup\step\ghost_files_cleanup
  */
 final class ghost_files_cleanup_test extends advanced_testcase {
+    /**
+     * Days between the two agreeing scans, for these tests.
+     */
+    const GRACE_DAYS = 7;
+
     /**
      * Load the output spy, which lives outside the autoloaded class directory.
      *
@@ -111,7 +117,11 @@ final class ghost_files_cleanup_test extends advanced_testcase {
 
         $this->run_cleanup();
 
-        $this->assertFileDoesNotExist($path, 'An unreferenced file should be removed from disk.');
+        $this->assertFileDoesNotExist($path, 'An unreferenced file should leave the pool.');
+        $this->assertFileExists(
+            $this->trash_path($hash),
+            'It should be in the trash, where Moodle\'s trash clean-up gives a recovery window.'
+        );
         $this->assertFalse(
             $DB->record_exists('local_cleanup_files', ['id' => $recordid]),
             'The scan record should be dropped once the file is gone.'
@@ -151,7 +161,113 @@ final class ghost_files_cleanup_test extends advanced_testcase {
         $output = $this->run_cleanup();
 
         $this->assertSame(0, $DB->count_records('local_cleanup_files'));
-        $this->assertTrue($output->contains('Done!'));
+        $this->assertTrue(
+            $output->contains('nothing found'),
+            'An empty scan table should be reported as nothing found.'
+        );
+    }
+
+    /**
+     * A dry run counts the unreferenced files and deletes neither row nor file.
+     *
+     * @return void
+     */
+    public function test_report_counts_without_deleting(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $content = 'orphaned content ' . random_string(32);
+        $hash = sha1($content);
+        $path = $this->write_pool_file($hash, $content);
+        $recordid = $this->record_as_ghost($hash);
+
+        $result = $this->run_report();
+
+        $this->assertSame(1, $result->get_records());
+        $this->assertFileExists($path, 'A dry run must not touch the file.');
+        $this->assertTrue(
+            $DB->record_exists('local_cleanup_files', ['id' => $recordid]),
+            'A dry run must not clear the scan record either.'
+        );
+    }
+
+    /**
+     * A file seen unlinked only once is left alone.
+     *
+     * Content uploaded between two scans can deduplicate onto a hash an earlier scan recorded
+     * as unlinked. One sighting is not evidence, so the grace period must elapse first.
+     *
+     * @return void
+     */
+    public function test_a_file_seen_only_once_is_kept(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $content = 'freshly noticed ' . random_string(32);
+        $hash = sha1($content);
+        $path = $this->write_pool_file($hash, $content);
+
+        // First and latest sighting are the same moment: one scan, no corroboration.
+        $recordid = $this->record_as_ghost($hash, 0);
+
+        $this->run_cleanup();
+
+        $this->assertFileExists($path, 'A single sighting must not be enough to remove a file.');
+        $this->assertTrue(
+            $DB->record_exists('local_cleanup_files', ['id' => $recordid]),
+            'The record stays so a later scan can corroborate it.'
+        );
+    }
+
+    /**
+     * A file whose two sightings are closer together than the grace period is left alone.
+     *
+     * @return void
+     */
+    public function test_a_file_inside_the_grace_period_is_kept(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $content = 'seen twice, too soon ' . random_string(32);
+        $hash = sha1($content);
+        $path = $this->write_pool_file($hash, $content);
+        $recordid = $this->record_as_ghost($hash, self::GRACE_DAYS - 1);
+
+        $this->run_cleanup();
+
+        $this->assertFileExists($path);
+        $this->assertTrue($DB->record_exists('local_cleanup_files', ['id' => $recordid]));
+    }
+
+    /**
+     * The per-run ceiling stops the step partway and leaves the rest for next time.
+     *
+     * @return void
+     */
+    public function test_the_per_run_ceiling_is_honoured(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        set_config('maxrecordsperrun', 1, 'local_cleanup');
+
+        foreach (['first', 'second'] as $which) {
+            $content = $which . ' orphan ' . random_string(32);
+            $hash = sha1($content);
+            $this->write_pool_file($hash, $content);
+            $this->record_as_ghost($hash);
+        }
+
+        $this->run_cleanup();
+
+        $this->assertSame(
+            1,
+            $DB->count_records('local_cleanup_files'),
+            'Exactly one scan record should survive to the next run.'
+        );
     }
 
     /**
@@ -163,25 +279,44 @@ final class ghost_files_cleanup_test extends advanced_testcase {
         global $CFG, $DB;
 
         $output = new spy_output();
-        $step = new ghost_files_cleanup($DB, $CFG->dataroot);
-        $step->cleanup($output);
+        $step = new ghost_files_cleanup($DB, $CFG->dataroot, self::GRACE_DAYS);
+        $step->execute($output);
 
         return $output;
+    }
+
+    /**
+     * Report on the step under test.
+     *
+     * @return step_result What would be removed
+     */
+    private function run_report(): step_result {
+        global $CFG, $DB;
+
+        return (new ghost_files_cleanup($DB, $CFG->dataroot, self::GRACE_DAYS))->report(new spy_output());
     }
 
     /**
      * Record a content hash in the scan table, as the scan task would.
      *
      * @param string $hash Content hash
+     * @param int|null $confirmeddaysago Days ago the first sighting was, or null for eligible
      * @return int Id of the inserted record
      */
-    private function record_as_ghost(string $hash): int {
+    private function record_as_ghost(string $hash, ?int $confirmeddaysago = null): int {
         global $DB;
+
+        // Default to a first sighting well outside the grace period, so the file is eligible
+        // and each test can say so explicitly when it wants otherwise.
+        $confirmeddaysago = $confirmeddaysago ?? self::GRACE_DAYS + 1;
+        $now = time();
 
         return $DB->insert_record('local_cleanup_files', (object)[
             'path' => $this->pool_relative_path($hash),
             'mime' => 'application/octet-stream',
             'size' => 1024,
+            'timeconfirmed' => $now - $confirmeddaysago * DAYSECS,
+            'timescanned' => $now,
         ]);
     }
 
@@ -212,6 +347,21 @@ final class ghost_files_cleanup_test extends advanced_testcase {
             . substr($hash, 0, 2) . DIRECTORY_SEPARATOR
             . substr($hash, 2, 2) . DIRECTORY_SEPARATOR
             . $hash;
+    }
+
+    /**
+     * Build the absolute trash path for a content hash.
+     *
+     * @param string $hash Content hash
+     * @return string Absolute path
+     */
+    private function trash_path(string $hash): string {
+        global $CFG;
+
+        return $CFG->dataroot . DIRECTORY_SEPARATOR . 'trashdir'
+            . DIRECTORY_SEPARATOR . substr($hash, 0, 2)
+            . DIRECTORY_SEPARATOR . substr($hash, 2, 2)
+            . DIRECTORY_SEPARATOR . $hash;
     }
 
     /**

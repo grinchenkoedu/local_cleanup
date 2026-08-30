@@ -105,6 +105,16 @@ if ($hassiteconfig) {
 
     $settings->add(
         new admin_setting_configtext(
+            'local_cleanup/maxrecordsperrun',
+            get_string('maxrecordsperrun', 'local_cleanup'),
+            get_string('maxrecordsperrundesc', 'local_cleanup'),
+            0,
+            PARAM_INT
+        )
+    );
+
+    $settings->add(
+        new admin_setting_configtext(
             'local_cleanup/componentfileslifetimedays',
             get_string('componentfileslifetime', 'local_cleanup'),
             get_string('componentfileslifetimedesc', 'local_cleanup'),
@@ -129,6 +139,16 @@ if ($hassiteconfig) {
             get_string('draftlifetime', 'local_cleanup'),
             get_string('draftlifetimedesc', 'local_cleanup'),
             30,
+            PARAM_INT
+        )
+    );
+
+    $settings->add(
+        new admin_setting_configtext(
+            'local_cleanup/ghostgracedays',
+            get_string('ghostgrace', 'local_cleanup'),
+            get_string('ghostgracedesc', 'local_cleanup'),
+            7,
             PARAM_INT
         )
     );
