@@ -103,6 +103,71 @@ final class filter_form_test extends advanced_testcase {
     }
 
     /**
+     * The deleted-user filter can be turned off again once it has been turned on.
+     *
+     * It was a plain checkbox, which submits nothing when cleared, so the value persisted and
+     * the filter could never be removed. That is what advcheckbox fixes, and it is only
+     * visible through a round trip.
+     *
+     * @return void
+     */
+    public function test_the_deleted_user_filter_can_be_cleared(): void {
+        $this->resetAfterTest();
+
+        $data = $this->submit(['user_deleted' => 0]);
+
+        $this->assertNotNull($data, 'The form should accept the submission.');
+        $this->assertSame(0, (int)$data->user_deleted, 'Clearing the box must reach the filter.');
+    }
+
+    /**
+     * And it still arrives when it is turned on.
+     *
+     * @return void
+     */
+    public function test_the_deleted_user_filter_can_be_set(): void {
+        $this->resetAfterTest();
+
+        $data = $this->submit(['user_deleted' => 1]);
+
+        $this->assertSame(1, (int)$data->user_deleted);
+    }
+
+    /**
+     * The size comes back as a number, which is what setType() is for.
+     *
+     * Three elements had none, so the form handed back whatever was posted.
+     *
+     * @return void
+     */
+    public function test_the_size_is_typed(): void {
+        $this->resetAfterTest();
+
+        $data = $this->submit(['filesize' => 100]);
+
+        $this->assertIsInt($data->filesize);
+        $this->assertSame(100, $data->filesize);
+    }
+
+    /**
+     * Submit the filter and return what it hands back.
+     *
+     * @param array $overrides Values to submit in place of the defaults
+     * @return \stdClass|null The submitted data
+     */
+    private function submit(array $overrides) {
+        filter_form::mock_submit($overrides + [
+            'name_like' => '',
+            'user_like' => '',
+            'user_deleted' => 0,
+            'component' => '',
+            'filesize' => 50,
+        ]);
+
+        return (new filter_form(null, ['components' => []]))->get_data();
+    }
+
+    /**
      * Clear the cached component list so a test sees its own fixtures.
      *
      * @return void
