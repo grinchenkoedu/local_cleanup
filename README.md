@@ -4,7 +4,7 @@
 [![Release](https://github.com/grinchenkoedu/local_cleanup/actions/workflows/release.yml/badge.svg)](https://github.com/grinchenkoedu/local_cleanup/actions/workflows/release.yml)
 [![Latest release](https://img.shields.io/github/v/release/grinchenkoedu/local_cleanup?sort=semver)](https://github.com/grinchenkoedu/local_cleanup/releases)
 [![Moodle](https://img.shields.io/badge/Moodle-4.1%20%7C%204.5%20%7C%205.0-orange)](https://moodle.org)
-[![PHP](https://img.shields.io/badge/PHP-8.1%20%7C%208.3%20%7C%208.4-777bb4)](https://www.php.net)
+[![PHP](https://img.shields.io/badge/PHP-7.4%20%7C%208.x-777bb4)](https://www.php.net)
 [![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
 
 Finds and removes what an overloaded Moodle install has accumulated: oversized files, files the
@@ -24,8 +24,13 @@ reports unless you pass `--execute`.
 ## Requirements
 
 * Moodle 4.1 – 5.0
-* PHP 7.4 or newer — the floor Moodle 4.1 itself sets. Continuous integration runs PHP 8.1, 8.3
-  and 8.4 against Moodle 4.1, 4.5 and 5.0, on PostgreSQL and MySQL
+* PHP 7.4 or newer — the floor Moodle 4.1 itself sets
+
+Continuous integration runs the full suite on PHP 8.1, 8.3 and 8.4 against Moodle 4.1, 4.5 and
+5.0, on PostgreSQL and MySQL. PHP 7.4 gets a syntax check and a guard against 8.x-only
+functions, because `moodle-plugin-ci` needs PHP 8 to run and so the suite itself cannot execute
+there. If you run 7.4, the plugin is built for it and checked for it, but the tests that prove
+behaviour run one version up.
 
 ## Installation
 
