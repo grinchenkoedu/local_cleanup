@@ -81,12 +81,19 @@ jobs:
         mkdir -p release-package/local_cleanup
         
         # Copy essential files
+        # release-package must be excluded: it sits inside the directory being copied, so
+        # without this the staging tree is copied into itself.
+        # README.md and CHANGELOG.md ship - they are the plugin's documentation, and the
+        # Moodle plugins directory expects them. Only the agent instruction files are dropped.
         rsync -av \
+          --exclude='release-package/' \
           --exclude='.git*' \
           --exclude='.github/' \
+          --exclude='.tasks/' \
           --exclude='node_modules/' \
           --exclude='vendor/' \
-          --exclude='*.md' \
+          --exclude='CLAUDE.md' \
+          --exclude='AGENTS.md' \
           --exclude='composer.*' \
           --exclude='package*.json' \
           --exclude='*.yml' \
