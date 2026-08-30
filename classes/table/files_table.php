@@ -19,13 +19,6 @@ namespace local_cleanup\table;
 use html_writer;
 use local_cleanup\finder;
 use moodle_url;
-use table_sql;
-
-defined('MOODLE_INTERNAL') || die();
-
-global $CFG;
-
-require_once($CFG->libdir . '/tablelib.php');
 
 /**
  * The files report.
@@ -39,7 +32,7 @@ require_once($CFG->libdir . '/tablelib.php');
  * @copyright  2026 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class files_table extends table_sql {
+class files_table extends report_table {
     /**
      * Whether the viewer may delete a file.
      *
@@ -99,42 +92,6 @@ class files_table extends table_sql {
             sprintf('SELECT COUNT(f.id) FROM %s WHERE %s', $parts['from'], $parts['where']),
             $parts['params']
         );
-    }
-
-    /**
-     * Neutralise a value a spreadsheet would treat as a formula.
-     *
-     * A cell beginning =, +, - or @ is executed when the file is opened, so a file named
-     * "=cmd|'/c calc'!A0.pdf" runs on the machine of whoever opens the export. Prefixing an
-     * apostrophe is the standard defence: spreadsheets read it as "this is text" and drop it.
-     *
-     * @param string $value The raw value
-     * @return string Safe to place in a spreadsheet cell
-     */
-    public static function neutralise_formula(string $value): string {
-        if ($value !== '' && strpos("=+-@\t\r", $value[0]) !== false) {
-            return "'" . $value;
-        }
-
-        return $value;
-    }
-
-    /**
-     * Render text safely for whichever output this is.
-     *
-     * table_sql does not escape cell contents - that is what these methods are for - and the
-     * two outputs need opposite things: HTML wants entities, a spreadsheet wants none of them
-     * but does need formulas defused.
-     *
-     * @param string $value The raw value
-     * @return string Cell contents
-     */
-    private function text(string $value): string {
-        if ($this->is_downloading()) {
-            return self::neutralise_formula($value);
-        }
-
-        return s($value);
     }
 
     /**
@@ -257,18 +214,4 @@ class files_table extends table_sql {
             || ($row->component === 'backup' && $row->filearea === 'course');
     }
 
-    /**
-     * Say so plainly when a filter matches nothing.
-     *
-     * @return void
-     */
-    public function print_nothing_to_display() {
-        global $OUTPUT;
-
-        echo $this->render_reset_button();
-
-        $this->print_initials_bar();
-
-        echo $OUTPUT->notification(get_string('nothingtoshow', 'local_cleanup'), 'notifymessage');
-    }
 }

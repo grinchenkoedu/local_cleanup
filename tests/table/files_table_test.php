@@ -65,7 +65,7 @@ final class files_table_test extends advanced_testcase {
      * @return void
      */
     public function test_formulas_are_neutralised(string $filename, string $expected): void {
-        $this->assertSame($expected, files_table::neutralise_formula($filename));
+        $this->assertSame($expected, report_table::neutralise_formula($filename));
     }
 
     /**
