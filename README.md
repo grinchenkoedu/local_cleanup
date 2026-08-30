@@ -36,9 +36,28 @@ reports unless you pass `--execute`.
 4. Review the settings at *Site administration → Plugins → Local plugins → Clean-up*
 5. The reports are at *Site administration → Clean-up → Files* and *→ Unlinked files*
 
-Upgrading from 2.3 or earlier: your existing `$CFG->cleanup_*` settings are migrated
-automatically into the plugin's own namespace and the old ones removed. See the
-[3.0 breaking changes](CHANGELOG.md#30---2026-08-30) before you upgrade.
+### Upgrading from 2.x
+
+Copy the new files over and run the Moodle upgrade as usual. Your configuration carries over —
+the `$CFG->cleanup_*` settings are migrated into the plugin's own namespace and the old values
+removed, and a site that had auto-remove on keeps backups and assignment submissions ticked,
+matching the pair 2.x hardcoded. Four things are worth checking afterwards:
+
+1. **Managers can now open the reports.** 2.x admitted only site administrators. 3.0 grants
+   `local/cleanup:view` to the `manager` archetype, so managers see both reports and the file
+   owners' names. Revoke it if that is not what you want.
+2. **Only site administrators can delete.** `local/cleanup:deletefiles` is granted to no
+   archetype; administrators keep it because they hold everything. Grant it deliberately if
+   somebody else needs it.
+3. **Unlinked files will not be removed for the first `ghostgracedays`.** Existing rows are not
+   backfilled, so the first scan after the upgrade counts as the first of the two sightings that
+   have to agree, and the list sits still for a week. That is the point — see
+   [the grace period](#what-automatic-clean-up-removes).
+4. **Delete any `$CFG->cleanup_*` lines from `config.php`.** The upgrade migrates the value and
+   clears the database config, but it cannot edit `config.php`; whatever is left there is dead.
+
+Then run `php local/cleanup/cli/cleanup.php` to see what the new version would remove before you
+let it act. The full list of changes is in [CHANGELOG.md](CHANGELOG.md#30---2026-08-30).
 
 ## Access
 

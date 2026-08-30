@@ -141,7 +141,12 @@ jobs:
       run: |
         TAG_VERSION=${GITHUB_REF#refs/tags/}
         
-        if [ -f "CHANGELOG.md" ]; then
+        # Hand-written notes for this tag win when they exist: the changelog is the full
+        # record, the release notes are what somebody upgrading actually needs to read.
+        if [ -f ".github/release-notes/${TAG_VERSION}.md" ]; then
+          cp ".github/release-notes/${TAG_VERSION}.md" release_notes.txt
+          echo "Using .github/release-notes/${TAG_VERSION}.md"
+        elif [ -f "CHANGELOG.md" ]; then
           # Extract release notes for this version from CHANGELOG.md
           awk "/^## \[$TAG_VERSION\]|^## $TAG_VERSION/{flag=1; next} /^## /{flag=0} flag" CHANGELOG.md > release_notes.txt
           
