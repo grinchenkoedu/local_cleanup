@@ -19,7 +19,7 @@ reports unless you pass `--execute`.
 - [Requirements](#requirements) · [Installation](#installation) · [Access](#access)
 - [Seeing what would be removed](#seeing-what-would-be-removed) · [What automatic clean-up removes](#what-automatic-clean-up-removes) · [Settings](#settings)
 - [Cron](#cron) · [Command line](#command-line) · [Database indexes](#database-indexes)
-- [Stuck course modules](#stuck-course-modules)
+- [Stuck course modules](#stuck-course-modules) · [Stranded activities](#stranded-activities)
 
 ## Requirements
 
@@ -195,6 +195,7 @@ php admin/cli/check_database_schema.php
 | `cli/cleanup.php` | Reports what every step would remove. `--execute` (`-e`) to actually remove it |
 | `cli/usage_statistics.php` | File counts and sizes per component, and by age |
 | `cli/reinit_modules_cleanup.php` | Rebuilds removal tasks for course modules stuck mid-deletion. Explains itself and stops unless given `--force` (`-f`) |
+| `cli/fix_orphaned_instances.php` | Removes activities left with no course module. Reports unless given `--execute` (`-e`) |
 
 All three take `--help` (`-h`).
 
@@ -259,6 +260,54 @@ php $MOODLE_DIR/local/cleanup/cli/reinit_modules_cleanup.php --force
 This removes the existing removal tasks and creates fresh ones for every course module marked
 for deletion. The clean-up task will also force through modules whose removal task has been
 failing for longer than `coursemoduleslifetimedays`.
+
+## Stranded activities
+
+The opposite problem, and a noisier one. When a deletion fails part-way the course module can go
+while the activity's own row stays, and an activity nothing points at is unreachable from the
+site but still visible to cron:
+
+```
+Scheduled task failed: ... (mod_assign\task\cron_task), Can not find data record in database table.
+... 'instance' => '126355', 'modulename' => 'assign',
+```
+
+The task fails on the first row it cannot resolve, and keeps failing: a failed task's
+`lastruntime` is not advanced, so the window it searches only widens. Everything after it in that
+task is skipped too — for assignments that means the `assignsubmission_*` and `assignfeedback_*`
+crons as well.
+
+Nothing in core clears this. `fix_course_sequence.php` is the closest, and it only reconciles
+`course_sections.sequence` against `course_modules`; it never opens a module's own table.
+
+```sh
+# Counts and names them, per module. Removes nothing.
+php $MOODLE_DIR/local/cleanup/cli/fix_orphaned_instances.php
+# Narrow it: one module, one course, or one activity.
+php $MOODLE_DIR/local/cleanup/cli/fix_orphaned_instances.php --modules=assign
+php $MOODLE_DIR/local/cleanup/cli/fix_orphaned_instances.php --courseid=1234
+php $MOODLE_DIR/local/cleanup/cli/fix_orphaned_instances.php --modules=assign --instanceid=126355 --execute
+```
+
+`--courseid` works for a course that has already been deleted, because the activity row keeps the
+id of the course it belonged to.
+
+What it does depends on whether that course survived:
+
+- **The course still exists.** The course module is put back — hidden, and marked for deletion
+  from the moment it exists — and core's own `course_delete_module()` removes the activity with
+  its grades, files, calendar events, tags and context. If anything fails part-way, what is left
+  is a stuck course module, which the section above deals with.
+- **The course has gone too.** Core cannot be used at all: every module's `delete_instance()`
+  finds the activity through the course module and the course. The activity row and its calendar
+  entries are deleted directly, and the module's own child rows — `assign_submission` and the
+  like — are left behind. They reference an activity that no longer exists, which breaks nothing.
+
+Activities modified within the last `--days` (default 7) are left alone. Having no course module
+yet is a normal state part-way through creating an activity or restoring a course, and that grace
+period is what keeps the repair away from one.
+
+This is a repair, not maintenance. It runs when you run it; nothing here is added to cron.
 
 ## Licence
 

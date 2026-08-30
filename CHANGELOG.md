@@ -4,6 +4,28 @@ All notable changes to the Moodle Clean-up Plugin will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+- **A forced course module deletion no longer strands the activity.** The manual fallback in the
+  stuck modules step copied everything core's `course_delete_module()` does except the first
+  thing it does — calling the module's own `delete_instance()` — so the course module went and
+  the activity's row stayed. A row nothing points at is unreachable from the site but not from
+  cron: `mod_assign\task\cron_task` selects straight from `{assign}` and fails on the first row
+  it cannot resolve, for the whole site, indefinitely. Where the course is gone the row and its
+  calendar entries are now removed directly, since core cannot do it; where the activity cannot
+  be removed at all the fallback aborts and leaves the course module in place, because a stuck
+  module is recoverable and a stranded activity is not
+
+### Added
+- **`cli/fix_orphaned_instances.php`** clears activities already stranded by that defect, or by
+  anything else that half-deleted a module. It reports unless given `--execute`, and narrows to
+  `--modules`, `--courseid` or a single `--instanceid`. Where the activity's course survives the
+  course module is rebuilt and core's `course_delete_module()` does the work; where it does not,
+  the row and its calendar entries go directly. Activities touched within `--days` (default 7)
+  are left alone, because having no course module yet is normal part-way through creating or
+  restoring one. It is a repair, run by hand: nothing new runs from cron
+
 ## [3.0] - 2026-08-30
 
 The release that turns a working internal tool into a plugin. Nothing about what it deletes has
