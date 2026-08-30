@@ -4,8 +4,6 @@ All notable changes to the Moodle Clean-up Plugin will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
-
 ## [3.0] - 2026-08-30
 
 The release that turns a working internal tool into a plugin. Nothing about what it deletes has
