@@ -259,6 +259,35 @@ final class module_instances_test extends advanced_testcase {
     }
 
     /**
+     * A row belonging to no course is a template, not a stranded activity.
+     *
+     * mod_survey installs five of them - course 0, no course module, a timemodified from 2001 -
+     * and deleting those would take the site's ability to create a survey from a template. This
+     * uses a page rather than a survey because core dropped mod_survey in 5.0, but the row it
+     * builds has the shape that matters.
+     *
+     * @return void
+     */
+    public function test_a_row_belonging_to_no_course_is_left_alone(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $module = $this->strand('page');
+        $DB->set_field('page', 'course', 0, ['id' => $module->id]);
+
+        $output = new spy_output();
+        $result = $this->repair()->report($output);
+
+        $this->assertSame(0, $result->get_records());
+        $this->assertTrue($output->contains('No stranded activities found.'));
+
+        $this->repair()->execute(new spy_output());
+
+        $this->assertTrue($DB->record_exists('page', ['id' => $module->id]), 'A template must survive.');
+    }
+
+    /**
      * A ceiling bounds one run, and what it does not reach waits for the next.
      *
      * @return void

@@ -310,6 +310,11 @@ class module_instances {
      * without it an assignment matches the course module of a quiz that happens to share a
      * number.
      *
+     * Rows belonging to no course at all are not stranded activities and are never candidates.
+     * Surveys are the reason: mod_survey installs five template rows with course = 0, no course
+     * module and a timemodified from 2001, and deleting those would take the site's ability to
+     * create a survey with them.
+     *
      * @param stdClass $module Module record, with an id and a name
      * @param int $limit Most rows to read, or zero for all of them
      * @return moodle_recordset Rows of id, course and courseexists
@@ -341,6 +346,7 @@ class module_instances {
           LEFT JOIN {course_modules} cm ON cm.instance = i.id AND cm.module = :moduleid
           LEFT JOIN {course} c ON c.id = i.course
               WHERE cm.id IS NULL
+                AND i.course > 0
                 AND i.timemodified < :cutoff%s
            ORDER BY i.id ASC",
             $module->name,
