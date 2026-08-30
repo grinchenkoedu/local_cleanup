@@ -4,7 +4,10 @@ All notable changes to the Moodle Clean-up Plugin will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [3.1] - 2026-08-31
+
+A repair release. One defect in the part of the plugin that forces a failed course module
+deletion through, and a command to clear what that defect left behind on sites that hit it.
 
 ### Fixed
 - **A forced course module deletion no longer strands the activity.** The manual fallback in the
@@ -25,6 +28,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   the row and its calendar entries go directly. Activities touched within `--days` (default 7)
   are left alone, because having no course module yet is normal part-way through creating or
   restoring one. It is a repair, run by hand: nothing new runs from cron
+
+### Upgrading from 2.x
+3.1 is days old, so a site still on 2.x will land here rather than on 3.0, and everything 3.0
+changed applies on the way. The full account is under [3.0](#30---2026-08-30); this is the short
+version.
+
+Two things break code, and neither stops an operator's existing setup working:
+
+- **Settings moved from `$CFG->cleanup_*` to the plugin's own `local_cleanup/` namespace** and
+  were renamed. The upgrade migrates every value and clears the old one, so configuration
+  carries over, but code reading `$CFG->cleanup_backup_timeout_days` and the rest must go
+  through `\local_cleanup\config`
+- **The clean-up step classes were renamed and moved** from `classes/steps/CamelCase.php` to
+  `classes/step/snake_case.php`. Code referencing them by class name must be updated
+
+Four things to check afterwards. None is a break; three are behaviour changes easy to mistake
+for one:
+
+- **Managers can now open the reports.** 2.x admitted site administrators only. `local/cleanup:view`
+  is granted to the `manager` archetype, so managers see both reports and the file owners' names.
+  Revoke it if that is not wanted
+- **Only site administrators can delete.** `local/cleanup:deletefiles` is granted to no archetype;
+  administrators keep it by holding everything. Grant it deliberately if somebody else needs it
+- **Unlinked files are not removed for the first `ghostgracedays`.** Existing rows are not
+  backfilled, so the first scan after the upgrade counts as the first of the two sightings that
+  must agree, and the list sits still for a week. Working as intended
+- **Any `$CFG->cleanup_*` lines left in `config.php` are dead.** The upgrade clears the database
+  config but cannot edit `config.php`. Delete them
+
+Then run `php local/cleanup/cli/cleanup.php` to see what this version would remove before letting
+it act.
 
 ## [3.0] - 2026-08-30
 
@@ -222,7 +256,8 @@ changes that are easy to mistake for one.
 
 | Version | Moodle | PHP | Status |
 |---------|--------|-----|--------|
-| 3.0     | 4.1 – 5.0 | 7.4+ | ✅ Current |
+| 3.1     | 4.1 – 5.0 | 7.4+ | ✅ Current |
+| 3.0     | 4.1 – 5.0 | 7.4+ | 📦 Archived |
 | 2.3     | 4.1+   | 7.4+ | 📦 Archived |
 | 2.1-2.2 | 4.1+   | 7.4+ | 📦 Archived |
 | 2.0     | 4.0+   | 7.4+ | 📦 Archived |
