@@ -98,6 +98,41 @@ final class ghost_table_test extends advanced_testcase {
     }
 
     /**
+     * The query behind the report returns the rows the scan recorded.
+     *
+     * The col_ methods above are asserted against stub objects, which proves the rendering but
+     * not that anything reaches them. This runs the real query.
+     *
+     * @return void
+     */
+    public function test_the_query_returns_the_recorded_files(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        foreach (['aa', 'bb'] as $index => $prefix) {
+            $DB->insert_record('local_cleanup_files', (object)[
+                'path' => "filedir/$prefix/cd/" . str_repeat($prefix, 20),
+                'mime' => 'application/octet-stream',
+                'size' => 1024 * ($index + 1),
+                'timeconfirmed' => time() - 30 * DAYSECS,
+                'timescanned' => time(),
+            ]);
+        }
+
+        $table = $this->create_table();
+        $table->setup();
+        $table->query_db(10, false);
+
+        $this->assertCount(2, $table->rawdata);
+
+        $sizes = array_map('intval', array_column(array_values($table->rawdata), 'size'));
+        sort($sizes);
+
+        $this->assertSame([1024, 2048], $sizes, 'Both recorded files should come back, with their sizes.');
+    }
+
+    /**
      * Build the table under test.
      *
      * @return ghost_table The table

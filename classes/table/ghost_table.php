@@ -64,6 +64,9 @@ class ghost_table extends report_table {
         $this->sortable(true, 'size', SORT_DESC);
         $this->collapsible(false);
 
+        // Everything the scan recorded is listed; table_sql insists on a WHERE clause, so this
+        // is a placeholder rather than a filter waiting to be written. timescanned is selected
+        // without being a column because col_timeconfirmed() needs it to work out the badge.
         $this->set_sql('id, path, mime, size, timeconfirmed, timescanned', '{local_cleanup_files}', '1 = 1');
         $this->set_count_sql('SELECT COUNT(1) FROM {local_cleanup_files}');
     }

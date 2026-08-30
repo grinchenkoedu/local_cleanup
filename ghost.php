@@ -49,9 +49,9 @@ $table->is_downloading(
 );
 
 if (!$table->is_downloading()) {
-    // get_scheduled_task() returns false when no task_scheduled row matches, which happens
-    // after a partial upgrade or if somebody deletes the task in Site administration. The
-    // totals are still worth showing, so only the date goes missing.
+    // The task lookup returns false when no task_scheduled row matches, which happens after
+    // a partial upgrade or if somebody deletes the task in Site administration. The totals are
+    // still worth showing, so only the date goes missing.
     $task = task_manager::get_scheduled_task(cleanup::class);
     $nextrun = $task
         ? userdate($task->get_next_run_time(), get_string('strftimedatetimeshort', 'langconfig'))
