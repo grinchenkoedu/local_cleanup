@@ -210,7 +210,7 @@ class files_table extends report_table {
      * @return bool True when open.php can resolve it
      */
     private function is_previewable($row): bool {
-        return (bool)preg_match('/^mod_/', $row->component)
+        return strpos($row->component, 'mod_') === 0
             || ($row->component === 'backup' && $row->filearea === 'course');
     }
 }
