@@ -73,5 +73,7 @@ $string['nextcleanup'] = 'Next clean-up: {$a}';
 $string['nothingtoshow'] = 'Nothing to show';
 $string['pluginname'] = 'Clean-up';
 $string['settingspage'] = 'Clean-up settings';
+$string['taskcleanup'] = 'Database and disk clean-up';
+$string['taskscan'] = 'Scan for unlinked files';
 $string['totalsize'] = 'Total size';
 $string['unknowncontext'] = 'This file belongs to a context that cannot be opened directly.';
