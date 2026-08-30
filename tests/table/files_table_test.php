@@ -83,4 +83,57 @@ final class files_table_test extends advanced_testcase {
             'an empty name is left alone' => ['', ''],
         ];
     }
+
+    /**
+     * The delete link is drawn only for a viewer holding local/cleanup:deletefiles.
+     *
+     * remove.php checks the capability itself, so this is not what keeps the file safe. It is
+     * what stops the report offering an action the viewer cannot take.
+     *
+     * @dataProvider candelete_provider
+     * @param bool $candelete Whether the viewer holds the capability
+     * @param bool $expected Whether the remove link belongs in the cell
+     * @return void
+     */
+    public function test_the_delete_link_follows_the_capability(bool $candelete, bool $expected): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $table = new files_table(
+            'test',
+            new finder($DB),
+            ['filesize' => 0],
+            new moodle_url('/local/cleanup/files.php'),
+            $candelete
+        );
+
+        $cell = $table->col_actions((object)[
+            'id' => 42,
+            'component' => 'mod_folder',
+            'filearea' => 'content',
+        ]);
+
+        if ($expected) {
+            $this->assertStringContainsString('/local/cleanup/remove.php', $cell);
+        } else {
+            $this->assertStringNotContainsString('/local/cleanup/remove.php', $cell);
+        }
+
+        // Either way the harmless actions stay, so a false negative cannot pass by
+        // rendering nothing at all.
+        $this->assertStringContainsString('/local/cleanup/download.php', $cell);
+    }
+
+    /**
+     * The two capability states.
+     *
+     * @return array[] Cases
+     */
+    public static function candelete_provider(): array {
+        return [
+            'holding the capability' => [true, true],
+            'without the capability' => [false, false],
+        ];
+    }
 }
