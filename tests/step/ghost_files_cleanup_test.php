@@ -243,6 +243,34 @@ final class ghost_files_cleanup_test extends advanced_testcase {
     }
 
     /**
+     * The per-run ceiling stops the step partway and leaves the rest for next time.
+     *
+     * @return void
+     */
+    public function test_the_per_run_ceiling_is_honoured(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        set_config('maxrecordsperrun', 1, 'local_cleanup');
+
+        foreach (['first', 'second'] as $which) {
+            $content = $which . ' orphan ' . random_string(32);
+            $hash = sha1($content);
+            $this->write_pool_file($hash, $content);
+            $this->record_as_ghost($hash);
+        }
+
+        $this->run_cleanup();
+
+        $this->assertSame(
+            1,
+            $DB->count_records('local_cleanup_files'),
+            'Exactly one scan record should survive to the next run.'
+        );
+    }
+
+    /**
      * Run the step under test.
      *
      * @return spy_output The captured output

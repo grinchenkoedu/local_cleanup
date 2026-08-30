@@ -167,6 +167,31 @@ final class files_checkout_test extends advanced_testcase {
     }
 
     /**
+     * The per-run ceiling stops the step partway and leaves the rest for next time.
+     *
+     * @return void
+     */
+    public function test_the_per_run_ceiling_is_honoured(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        set_config('maxrecordsperrun', 1, 'local_cleanup');
+
+        $first = $this->create_backup('one.mbz', 'first ' . random_string(32), $this->outdated());
+        $second = $this->create_backup('two.mbz', 'second ' . random_string(32), $this->outdated());
+
+        $this->run_checkout();
+
+        $this->assertSame(
+            1,
+            (int)$DB->record_exists('files', ['id' => $first->get_id()])
+                + (int)$DB->record_exists('files', ['id' => $second->get_id()]),
+            'Exactly one of the two backups should survive to the next run.'
+        );
+    }
+
+    /**
      * Run the step under test.
      *
      * @return spy_output The captured output

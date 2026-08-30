@@ -147,6 +147,33 @@ final class logs_cleanup_test extends advanced_testcase {
     }
 
     /**
+     * The per-run ceiling stops the step partway and leaves the rest for next time.
+     *
+     * @return void
+     */
+    public function test_the_per_run_ceiling_is_honoured(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        set_config('maxrecordsperrun', 1, 'local_cleanup');
+
+        $outdated = time() - (self::KEEP_DAYS + 1) * DAYSECS;
+        $first = $this->create_log($outdated);
+        $second = $this->create_log($outdated);
+
+        $result = $this->run_cleanup_result();
+
+        $this->assertSame(1, $result->get_records(), 'The ceiling caps what one run removes.');
+        $this->assertSame(
+            1,
+            (int)$DB->record_exists('logstore_standard_log', ['id' => $first])
+                + (int)$DB->record_exists('logstore_standard_log', ['id' => $second]),
+            'Exactly one of the two should survive to the next run.'
+        );
+    }
+
+    /**
      * Run the step under test.
      *
      * @return spy_output The captured output
@@ -159,6 +186,17 @@ final class logs_cleanup_test extends advanced_testcase {
         $step->execute($output);
 
         return $output;
+    }
+
+    /**
+     * Run the step under test and return what it did.
+     *
+     * @return step_result What was removed
+     */
+    private function run_cleanup_result(): step_result {
+        global $DB;
+
+        return (new logs_cleanup($DB, self::KEEP_DAYS))->execute(new spy_output());
     }
 
     /**
