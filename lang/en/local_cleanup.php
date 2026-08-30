@@ -54,7 +54,6 @@ $string['draftlifetimedesc'] = 'Number of days to keep draft files';
 $string['event_file_deleted'] = 'File deleted';
 $string['failtoremove'] = 'Failed to remove file "{$a->name}"';
 $string['fileremoved'] = 'File "{$a->name}" removed, {$a->size}Mb cleaned';
-$string['files_total'] = 'Files total';
 $string['filesfound'] = 'Files found';
 $string['firstseen'] = 'First seen unlinked';
 $string['ghostfiles'] = 'Unlinked files';
