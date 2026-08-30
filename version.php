@@ -28,8 +28,9 @@
 defined('MOODLE_INTERNAL') || die('Direct access to this script is forbidden.');
 
 $plugin->component = 'local_cleanup';
-$plugin->version = 2026083005;
+$plugin->version = 2026083006;
 $plugin->maturity = MATURITY_STABLE;
-$plugin->release = '3.0-dev';
+$plugin->release = '3.0';
 $plugin->requires = 2022041200; // Moodle 4.1 (LTS).
-$plugin->phpversion = '7.4.0';
+$plugin->supported = [401, 500]; // Tested against 4.1, 4.5 and 5.0.
+$plugin->phpversion = '7.4.0'; // The floor Moodle 4.1 itself sets; CI runs 8.1, 8.3 and 8.4.
