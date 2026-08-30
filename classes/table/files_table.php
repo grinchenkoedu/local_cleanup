@@ -213,5 +213,4 @@ class files_table extends report_table {
         return (bool)preg_match('/^mod_/', $row->component)
             || ($row->component === 'backup' && $row->filearea === 'course');
     }
-
 }
