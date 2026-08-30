@@ -128,24 +128,26 @@ class module_instances {
             $named = [];
             $orphans = $this->get_orphans($module);
 
-            foreach ($orphans as $orphan) {
-                $found++;
+            try {
+                foreach ($orphans as $orphan) {
+                    $found++;
 
-                if (empty($orphan->courseexists)) {
-                    $gone++;
-                }
+                    if (empty($orphan->courseexists)) {
+                        $gone++;
+                    }
 
-                if (count($named) < self::REPORT_ID_LIMIT) {
-                    $named[] = sprintf(
-                        '%d (course %d%s)',
-                        $orphan->id,
-                        $orphan->course,
-                        empty($orphan->courseexists) ? ', gone' : ''
-                    );
+                    if (count($named) < self::REPORT_ID_LIMIT) {
+                        $named[] = sprintf(
+                            '%d (course %d%s)',
+                            $orphan->id,
+                            $orphan->course,
+                            empty($orphan->courseexists) ? ', gone' : ''
+                        );
+                    }
                 }
+            } finally {
+                $orphans->close();
             }
-
-            $orphans->close();
 
             if ($found === 0) {
                 continue;
@@ -196,11 +198,13 @@ class module_instances {
             $pending = [];
             $orphans = $this->get_orphans($module);
 
-            foreach ($orphans as $orphan) {
-                $pending[] = $orphan;
+            try {
+                foreach ($orphans as $orphan) {
+                    $pending[] = $orphan;
+                }
+            } finally {
+                $orphans->close();
             }
-
-            $orphans->close();
 
             foreach ($pending as $orphan) {
                 $output->write(sprintf(
