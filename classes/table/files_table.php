@@ -154,7 +154,7 @@ class files_table extends table_sql {
      * @return string Cell contents
      */
     public function col_component($row): string {
-        return s(sprintf('%s, %s', $row->component, $row->filearea));
+        return $this->text(sprintf('%s, %s', $row->component, $row->filearea));
     }
 
     /**
@@ -174,19 +174,23 @@ class files_table extends table_sql {
      * @return string Cell contents
      */
     public function col_user($row): string {
-        $name = s(fullname($row));
-
         if (empty($row->userid)) {
             return '';
         }
 
+        $name = fullname($row);
+
+        if ($this->is_downloading()) {
+            return self::neutralise_formula($name);
+        }
+
         if (!empty($row->user_deleted)) {
-            return html_writer::tag('del', $name);
+            return html_writer::tag('del', s($name));
         }
 
         return html_writer::link(
             new moodle_url('/user/profile.php', ['id' => $row->userid]),
-            $name,
+            s($name),
             ['target' => '_blank']
         );
     }
