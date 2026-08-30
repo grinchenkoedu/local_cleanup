@@ -1,0 +1,52 @@
+{{!
+    This file is part of Moodle - https://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_cleanup/summary
+
+    The figures above a clean-up report.
+
+    Every value is printed with double braces rather than triple, so it is escaped. The rows
+    carry counts and sizes, but the note can carry a date, and none of it is markup.
+
+    Context variables required for this template:
+    * items - array of objects with label and value, in display order
+    * hasnote - whether there is a line to show underneath the figures
+    * note - that line
+
+    Example context (json):
+    {
+        "items": [
+            {"label": "Files found", "value": "2,462"},
+            {"label": "Total size", "value": "1.4 GB"}
+        ],
+        "hasnote": true,
+        "note": "Next clean-up: 1 September 2026, 3:00 AM"
+    }
+}}
+<div class="card mb-3 local-cleanup-summary">
+    <div class="card-body">
+        <dl class="row mb-0">
+            {{#items}}
+                <dt class="col-sm-4">{{label}}</dt>
+                <dd class="col-sm-8">{{value}}</dd>
+            {{/items}}
+        </dl>
+        {{#hasnote}}
+            <p class="text-muted mb-0 mt-2">{{note}}</p>
+        {{/hasnote}}
+    </div>
+</div>

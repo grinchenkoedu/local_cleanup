@@ -1,5 +1,5 @@
 <?php
-// This file is part of Moodle - http://moodle.org/
+// This file is part of Moodle - https://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,24 +12,27 @@
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+
+namespace local_cleanup\output;
+
+use plugin_renderer_base;
 
 /**
- * Plugin version and other meta-data are defined here.
+ * Renderer for the clean-up pages.
  *
  * @package    local_cleanup
- * @copyright  2024 Grinchenko University
+ * @copyright  2026 Grinchenko University
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @author     Yevhen Matasar <matasar.ei@gmail.com>
- *
- * @var $plugin stdClass
  */
-
-defined('MOODLE_INTERNAL') || die('Direct access to this script is forbidden.');
-
-$plugin->component = 'local_cleanup';
-$plugin->version = 2026083002;
-$plugin->maturity = MATURITY_STABLE;
-$plugin->release = '3.0-dev';
-$plugin->requires = 2022041200; // Moodle 4.1 (LTS).
-$plugin->phpversion = '7.4.0';
+class renderer extends plugin_renderer_base {
+    /**
+     * Render the figures above a report.
+     *
+     * @param summary $summary The figures
+     * @return string HTML
+     */
+    public function render_summary(summary $summary): string {
+        return $this->render_from_template('local_cleanup/summary', $summary->export_for_template($this));
+    }
+}

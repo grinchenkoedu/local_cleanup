@@ -29,6 +29,7 @@ require_once(__DIR__ . '/../../config.php');
 
 use core\task\manager as task_manager;
 use local_cleanup\config;
+use local_cleanup\output\summary;
 use local_cleanup\table\ghost_table;
 use local_cleanup\task\cleanup;
 
@@ -59,26 +60,18 @@ if (!$table->is_downloading()) {
 
     echo $OUTPUT->header();
 
-    echo $OUTPUT->box(
-        html_writer::tag(
-            'p',
-            html_writer::tag(
-                'b',
-                get_string(
-                    'ghosttotalheader',
-                    'local_cleanup',
-                    [
-                        'files' => $DB->count_records('local_cleanup_files'),
-                        'size' => sprintf(
-                            '%.3f',
-                            ($DB->get_field('local_cleanup_files', 'SUM(size)', []) ?: 0) / pow(1024, 3)
-                        ),
-                        'cleanup_date' => $nextrun,
-                    ]
-                )
-            )
+    $summary = (new summary())
+        ->add(
+            get_string('filesfound', 'local_cleanup'),
+            number_format($DB->count_records('local_cleanup_files'))
         )
-    );
+        ->add(
+            get_string('totalsize', 'local_cleanup'),
+            display_size((int)($DB->get_field('local_cleanup_files', 'SUM(size)', []) ?: 0))
+        )
+        ->set_note(get_string('nextcleanup', 'local_cleanup', $nextrun));
+
+    echo $PAGE->get_renderer('local_cleanup')->render($summary);
 }
 
 $table->out(config::items_per_page(), true);
