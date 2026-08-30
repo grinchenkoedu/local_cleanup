@@ -154,13 +154,34 @@ class finder {
     }
 
     /**
-     * Build SQL query for file search.
+     * The search, in the pieces table_sql wants: fields, from, where and parameters.
+     *
+     * The report page builds its table from these rather than from find(), so there is one
+     * definition of what a search means and the page cannot drift from the programmatic API.
      *
      * @param array $filter Filter criteria
-     * @param bool $count Whether this is for counting (true) or selecting records (false)
-     * @return string SQL query
+     * @return array{fields: string, from: string, where: string, params: array} The pieces
      */
-    private function get_search_sql(array $filter, bool $count = false): string {
+    public function get_sql_parts(array $filter): array {
+        $userfields = fields::for_name()
+            ->get_sql('u', false, '', '', false)
+            ->selects;
+
+        return [
+            'fields' => 'f.*, u.deleted AS user_deleted, ' . $userfields,
+            'from' => '{files} f LEFT JOIN {user} u ON f.userid = u.id',
+            'where' => implode(' AND ', $this->get_where($filter)),
+            'params' => $this->get_search_values($filter),
+        ];
+    }
+
+    /**
+     * The conditions a filter imposes.
+     *
+     * @param array $filter Filter criteria
+     * @return string[] Conditions, to be joined with AND
+     */
+    private function get_where(array $filter): array {
         $where = [
             'f.filesize > :filesize',
         ];
@@ -190,16 +211,27 @@ class finder {
             $where[] = 'u.deleted = 1';
         }
 
+        return $where;
+    }
+
+    /**
+     * Build SQL query for file search.
+     *
+     * @param array $filter Filter criteria
+     * @param bool $count Whether this is for counting (true) or selecting records (false)
+     * @return string SQL query
+     */
+    private function get_search_sql(array $filter, bool $count = false): string {
+        $parts = $this->get_sql_parts($filter);
+        $where = [$parts['where']];
+
         if ($count) {
             return sprintf(
-                'SELECT COUNT(f.id) FROM {files} f LEFT JOIN {user} u ON f.userid = u.id WHERE %s',
-                implode(' AND ', $where)
+                'SELECT COUNT(f.id) FROM %s WHERE %s',
+                $parts['from'],
+                $parts['where']
             );
         }
-
-        $userfields = fields::for_name()
-            ->get_sql('u', false, '', '', false)
-            ->selects;
 
         // Records that share a content hash are still separate records, each listed and each
         // deleted on its own, so they are no longer collapsed. Collapsing them also selected
@@ -214,9 +246,10 @@ class finder {
         // unordered query allowed, and with a component filter set the component_filesize
         // index serves this ordering. Do not remove it to save the sort.
         return sprintf(
-            'SELECT %s FROM {files} f LEFT JOIN {user} u ON f.userid = u.id WHERE %s ORDER BY %s',
-            'f.*, u.deleted as user_deleted, ' . $userfields,
-            implode(' AND ', $where),
+            'SELECT %s FROM %s WHERE %s ORDER BY %s',
+            $parts['fields'],
+            $parts['from'],
+            $parts['where'],
             'f.filesize DESC, f.id ASC'
         );
     }
