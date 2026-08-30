@@ -6,21 +6,91 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [3.0] - 2026-08-30
+
+The release that turns a working internal tool into a plugin. Nothing about what it deletes has
+been loosened; most of the work went into making the scope of each deletion visible before it
+happens, and into proving it with tests.
+
+### Breaking
+- **Settings moved from `$CFG->cleanup_*` to the plugin's own `local_cleanup/` namespace** and
+  were renamed. The upgrade migrates every existing value and removes the old one, so a site
+  keeps its configuration, but anything reading `$CFG->cleanup_backup_timeout_days` and the
+  rest directly must now go through `\local_cleanup\config`
+- **Access is by capability, not by being a site administrator.** `local/cleanup:view` reads the
+  reports and is granted to `manager`; `local/cleanup:deletefiles` removes a file and is granted
+  to **no archetype**, because it destroys content irreversibly. Grant it deliberately
+- **The clean-up step classes were renamed and moved** from `classes/steps/CamelCase.php` to
+  `classes/step/snake_case.php`, matching Moodle's own naming. Any code referencing them by
+  class name must be updated
+- **`cli/cleanup.php` reports by default and only deletes with `--execute`.** A cron entry or
+  script that relied on the bare command removing things will now report and exit
+- **The cleanable component list starts empty.** A site that had `autoremove` on keeps the two
+  components it was effectively using; a site that did not gets nothing selected, and must
+  choose. `config::CLEANABLE_COMPONENTS` is a fixed allowlist, so a stray database value cannot
+  widen what may be deleted
+
+### Security
+- Added a privacy provider. The plugin stores no personal data, but it had never said so, and
+  the site's data registry listed it as not implemented
+- The report tables escape every database value they render. `table_sql` does not escape cell
+  contents, so each column that shows a stored value does it explicitly
+- Spreadsheet exports neutralise formula injection: a file name or user name beginning `=`,
+  `+`, `-` or `@` is prefixed so a spreadsheet shows it instead of running it
+
 ### Fixed
 - The files report never worked on PostgreSQL. `finder` selected `f.*`, the user name fields
   and `u.deleted` while grouping by `f.contenthash` alone, which PostgreSQL rejects, so every
   search raised a database error. Records sharing a content hash are now listed separately,
   as each is deleted separately, which also makes the total agree with the rows shown
 - Paging had no ordering, so a row could appear on two pages or on none. The report is now
-  ordered by size, largest first
+  ordered by size, largest first, and is sortable
+- The pager's total was invented. `files.php` capped it with `pow(10, 3) * ($page + 1)` because
+  the count query and the select query were different SQL and had never agreed
 - A deprecated implicit float-to-int conversion in the batch timing wrote a PHP notice on
   every batch under PHP 8.1 and above, and failed outright on Moodle 5.0
+- The unlinked files page crashed when its scheduled task record was missing:
+  `get_scheduled_task()` returns `false`, and `->get_next_run_time()` on `false` took the page
+  down. The totals now show without a date
+- The deleted-user filter could be switched on but never off. It was a plain checkbox, which
+  submits nothing when cleared, so the value persisted across requests
+- The filename filter matched case-sensitively on PostgreSQL and case-insensitively on MySQL.
+  It now uses `sql_like()` and behaves the same on both
 
 ### Added
-- The plugin's first test suite: PHPUnit coverage of the file search and of every clean-up
-  step except course modules, plus Behat coverage of both reports and their access checks
-- CI now runs PHPUnit, Behat, Mustache, Grunt, copy/paste and mess detection, and tests
-  against MySQL as well as PostgreSQL
+- **A dry run everywhere.** Every clean-up step implements `report()` alongside `execute()`, and
+  `cli/cleanup.php` reports unless given `--execute`, so what a run would remove can be seen
+  before it removes it
+- **A per-run ceiling.** `maxrecordsperrun` stops any one step removing more than a set number
+  of records in a single run, so a long backlog is worked through over several nights instead
+  of overrunning the cron window. Zero, the default, means no limit
+- **A grace period before an unlinked file is removed.** Two scans a configurable interval apart
+  must agree that a file is unreferenced. Content uploaded between scans can deduplicate onto a
+  hash an earlier scan recorded as unlinked, and that file used to be destroyed
+- A `\local_cleanup\event\file_deleted` event, so deletions appear in the site log with the
+  file name, size and the user who removed it
+- Both reports are `table_sql`: sorting, honest paging, and CSV or Excel download
+- The unlinked files report shows when a file was first seen unlinked, with an *awaiting a
+  second scan* badge, so it is clear why a listed file has not been removed yet
+- The component filter is built from the components that actually own files on the site,
+  replacing four hardcoded entries
+- `cli/usage_statistics.php` and `cli/reinit_modules_cleanup.php` take proper arguments through
+  `cli_get_params()`
+- A plugin icon, and a summary block rendered from a mustache template
+- **The plugin's first test suite** — 103 PHPUnit tests covering the file search, every
+  clean-up step, the configuration accessors, the upgrade path, the capabilities, the report
+  tables, the filter form and the privacy provider, plus Behat coverage of both reports and
+  their access checks
+- CI runs PHPUnit, Behat, Mustache, Grunt, copy/paste and mess detection across PHP 8.1, 8.3
+  and 8.4 on Moodle 4.1, 4.5 and 5.0, and against MySQL as well as PostgreSQL. The second
+  database engine exists because the PostgreSQL defect above survived two years of
+  single-engine CI
+
+### Changed
+- Settings have descriptions explaining what each one widens or narrows, and the ones that
+  widen what may be deleted default to off
+- `README.md` is written for the operator: capabilities, the dry-run workflow, cron, and the
+  indexes this plugin adds to the core `files` table
 
 ## [2.3] - 2026-08-28
 
@@ -113,7 +183,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 | Version | Moodle | PHP | Status |
 |---------|--------|-----|--------|
-| 2.3     | 4.1+   | 7.4+ | ✅ Current |
+| 3.0     | 4.1 – 5.0 | 7.4+ | ✅ Current |
+| 2.3     | 4.1+   | 7.4+ | 📦 Archived |
 | 2.1-2.2 | 4.1+   | 7.4+ | 📦 Archived |
 | 2.0     | 4.0+   | 7.4+ | 📦 Archived |
 | 1.x     | 3.9+   | 7.2+ | ❌ EOL |
