@@ -34,6 +34,7 @@ $string['backuplifetime'] = 'Backup files lifetime';
 $string['backuplifetimedesc'] = 'Number of days to keep backups';
 $string['cleanup:deletefiles'] = 'Delete files found by the clean-up reports';
 $string['cleanup:view'] = 'View the clean-up reports';
+$string['cleanupnotscheduled'] = 'not scheduled';
 $string['component_assignfeedback_file'] = 'Assignment feedback files';
 $string['component_assignsubmission_file'] = 'Assignment file submissions';
 $string['component_backup'] = 'Course and activity backups';
